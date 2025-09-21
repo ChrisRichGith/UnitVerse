@@ -50,6 +50,9 @@ class Game:
         self.current_turn_index = 0
         self.game_state = "title_screen" # title_screen, preparation, combat, finished
         self.shop_units = []
+        self.round_count = 0
+        self.combat_log = []
+        self.winner = None
 
     def start_combat(self):
         all_units = [u for p in self.players for u in p.units]
@@ -62,18 +65,19 @@ class Game:
         return self.turn_order[self.current_turn_index]
 
     def execute_turn(self):
-        """Executes a single, simple attack turn."""
+        """
+        Executes a single attack for the current unit and returns a log string.
+        It does NOT advance the turn counter.
+        """
         if self.game_state != "combat":
-            return
+            return ""
 
         attacker = self.get_current_attacker()
         if attacker.is_defeated:
-            # Skip defeated units
-            self.current_turn_index = (self.current_turn_index + 1) % len(self.turn_order)
-            return
+            return "" # Skip defeated units, the main loop will advance the turn
 
         # Determine opponent
-        attacking_player = self.player1 if attacker in self.player1.board.values() else self.player2
+        attacking_player = self.player1 if attacker in self.player1.units else self.player2
         opponent_player = self.player2 if attacking_player is self.player1 else self.player1
 
         # Find first available target, respecting rows (front-row protection)
@@ -89,23 +93,87 @@ class Game:
 
         if target:
             # Apply damage
-            target.hp -= attacker.attack
+            damage = attacker.attack
+            target.hp -= damage
+            log_message = f"{attacker.name} greift {target.name} an und verursacht {damage} Schaden."
             if target.hp <= 0:
                 target.hp = 0
                 target.is_defeated = True
+                log_message += f" {target.name} wurde besiegt!"
+            return log_message
 
-        # Check for game over
-        self.check_game_over()
-
-        # Advance to next turn
-        self.current_turn_index = (self.current_turn_index + 1) % len(self.turn_order)
+        return f"{attacker.name} hat kein Ziel gefunden."
 
     def check_game_over(self):
         """Checks if all units of a player are defeated."""
-        p1_all_defeated = all(u.is_defeated for u in self.player1.board.values() if u)
-        p2_all_defeated = all(u.is_defeated for u in self.player2.board.values() if u)
-        if p1_all_defeated or p2_all_defeated:
-            self.game_state = "finished"
+        p1_units = [u for u in self.player1.units]
+        p2_units = [u for u in self.player2.units]
+
+        if not p1_units or not p2_units: return True
+
+        p1_all_defeated = all(u.is_defeated for u in p1_units)
+        p2_all_defeated = all(u.is_defeated for u in p2_units)
+
+        return p1_all_defeated or p2_all_defeated
+
+    def run_full_combat(self):
+        """Runs the entire combat automatically and logs the results."""
+        self.start_combat()
+
+        while self.round_count < 20:
+            self.round_count += 1
+            self.combat_log.append(f"--- Runde {self.round_count} ---")
+
+            for i in range(len(self.turn_order)):
+                self.current_turn_index = i
+                log_entry = self.execute_turn()
+                if log_entry:
+                    self.combat_log.append(log_entry)
+
+                # Check for game over after every turn
+                if self.check_game_over():
+                    self.game_state = "finished"
+                    self.determine_winner()
+                    return # Exit combat immediately
+
+        # If loop finishes, game ends due to round limit
+        self.game_state = "finished"
+        self.determine_winner()
+
+    def _calculate_total_hp_percentage(self, player):
+        """Calculates the total percentage of HP remaining for a player."""
+        if not player.units:
+            return 0
+
+        total_current_hp = sum(u.hp for u in player.units)
+        total_max_hp = sum(u.max_hp for u in player.units)
+
+        if total_max_hp == 0:
+            return 0
+
+        return (total_current_hp / total_max_hp) * 100
+
+    def determine_winner(self):
+        """Determines the winner based on elimination or HP percentage after 20 rounds."""
+        p1_units_alive = any(not u.is_defeated for u in self.player1.units)
+        p2_units_alive = any(not u.is_defeated for u in self.player2.units)
+
+        if not p1_units_alive:
+            self.winner = self.player2
+        elif not p2_units_alive:
+            self.winner = self.player1
+        elif self.round_count >= 20:
+            p1_hp_pct = self._calculate_total_hp_percentage(self.player1)
+            p2_hp_pct = self._calculate_total_hp_percentage(self.player2)
+            self.combat_log.append("Rundenlimit erreicht! Der Gewinner wird durch die verbleibenden Lebenspunkte bestimmt.")
+            self.combat_log.append(f"{self.player1.name}: {p1_hp_pct:.2f}% HP | {self.player2.name}: {p2_hp_pct:.2f}% HP")
+
+            if p1_hp_pct > p2_hp_pct:
+                self.winner = self.player1
+            elif p2_hp_pct > p1_hp_pct:
+                self.winner = self.player2
+            else:
+                self.winner = "Unentschieden" # Draw
 
 # --- UNIT GENERATION ---
 UNIT_NAMES = ["Goblin", "Orc", "Elf", "Dwarf", "Knight", "Mage", "Rogue", "Golem"]
@@ -140,12 +208,6 @@ def index():
     if game is None:
         game = setup_game()
     return render_template('index.html', game=game)
-
-@app.route('/next_turn', methods=['POST'])
-def next_turn():
-    if game:
-        game.execute_turn()
-    return redirect(url_for('index'))
 
 def pc_shopping_ai(player, shop_units):
     """A simple AI for the PC to buy and place units."""
@@ -214,7 +276,7 @@ def buy_unit(unit_id):
 def start_combat():
     """Transitions the game from preparation to combat."""
     if game and game.game_state == "preparation":
-        game.start_combat()
+        game.run_full_combat()
     return redirect(url_for('index'))
 
 @app.route('/new_game', methods=['POST'])
