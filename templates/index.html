@@ -5,8 +5,16 @@
     <title>UnitVerse</title>
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; text-align: center; }
-        .board { border: 1px solid black; margin: 1em; padding: 1em; }
-        .slot { border: 1px solid #eee; min-height: 50px; min-width: 80px; padding: 5px; }
+        .board {
+            border: 1px solid black;
+            margin: 1em;
+            padding: 1em;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 columns */
+            grid-template-rows: repeat(3, 1fr);    /* 3 rows */
+            gap: 5px;
+        }
+        .slot { border: 1px solid #eee; min-height: 60px; min-width: 90px; padding: 5px; }
         .defeated { text-decoration: line-through; opacity: 0.5; }
         .game-container, .prep-container { display: flex; align-items: flex-start; }
         .title-screen { padding: 2em; }
@@ -32,16 +40,14 @@
             <h3>Dein Team</h3>
             <div class="board">
             {% for r in range(3) %}
-                <div class="row">
                 {% for c in range(2) %}
                     <div class="slot">
-                        {% set unit = game.player1.board[(r,c)] %}
+                        {% set unit = game.player1.board.get((r,c)) %}
                         {% if unit %}
                             <div><strong>{{ unit.name }}</strong></div>
                         {% endif %}
                     </div>
                 {% endfor %}
-                </div>
             {% endfor %}
             </div>
         </div>
@@ -72,10 +78,9 @@
             <h2>Spieler 1</h2>
             <div class="board">
             {% for r in range(3) %}
-                <div class="row">
                 {% for c in range(2) %}
                     <div class="slot">
-                        {% set unit = game.player1.board[(r,c)] %}
+                        {% set unit = game.player1.board.get((r,c)) %}
                         {% if unit %}
                             <div class="{{ 'defeated' if unit.is_defeated else '' }}">
                                 <strong>{{ unit.name }}</strong><br>
@@ -84,7 +89,6 @@
                         {% endif %}
                     </div>
                 {% endfor %}
-                </div>
             {% endfor %}
         </div>
     </div>
@@ -108,10 +112,9 @@
         <h2>Spieler 2</h2>
         <div class="board">
             {% for r in range(3) %}
-                <div class="row">
                 {% for c in range(2) %}
                     <div class="slot">
-                        {% set unit = game.player2.board[(r,c)] %}
+                        {% set unit = game.player2.board.get((r,c)) %}
                         {% if unit %}
                             <div class="{{ 'defeated' if unit.is_defeated else '' }}">
                                 <strong>{{ unit.name }}</strong><br>
@@ -120,7 +123,6 @@
                         {% endif %}
                     </div>
                 {% endfor %}
-                </div>
             {% endfor %}
         </div>
     </div>
