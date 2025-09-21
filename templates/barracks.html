@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>UnitVerse - Kaserne</title>
+    <style>
+        body { font-family: sans-serif; padding: 2em; }
+        h1, h2 { text-align: center; }
+        .barracks-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 1em; }
+        .unit-card { border: 1px solid #999; padding: 1em; width: 200px; background: #f9f9f9; }
+        a.button {
+            display: inline-block; padding: 0.5em 1em; background: #007bff; color: white;
+            text-decoration: none; border-radius: 5px; margin-top: 2em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Kaserne</h1>
+    <h2>Deine gespeicherten Einheiten</h2>
+    <div class="barracks-container">
+        {% if player1.barracks %}
+            {% for unit in player1.barracks %}
+            <div class="unit-card">
+                <strong>{{ unit.name }} (Level {{ unit.level }})</strong><br>
+                HP: {{ unit.max_hp }} | Atk: {{ unit.attack }}<br>
+                Init: {{ unit.initiative }}<br>
+                XP: {{ unit.xp }} / {{ unit.level * 100 }}
+                {% set xp_needed = unit.level * 100 %}
+                {% if unit.xp >= xp_needed %}
+                <form action="/upgrade_unit/{{ unit.id }}" method="post" style="margin-top: 0.5em;">
+                    <button type="submit">Upgrade!</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <p>Deine Kaserne ist leer.</p>
+        {% endif %}
+    </div>
+
+    <div style="text-align: center;">
+        <a href="{{ url_for('index') }}" class="button">Zurück zum Hauptmenü</a>
+    </div>
+</body>
+</html>

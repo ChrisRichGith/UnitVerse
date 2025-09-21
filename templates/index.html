@@ -26,9 +26,10 @@
     {% if game.game_state == 'title_screen' %}
     <div class="title-screen">
         <h1>UnitVerse</h1>
-        <form action="/start_game" method="post">
-            <button type="submit" style="font-size: 1.2em; padding: 0.5em 1em;">Spiel starten</button>
+        <form action="/start_game" method="post" style="margin-bottom: 1em;">
+            <button type="submit" style="font-size: 1.2em; padding: 0.5em 1em;">Neues Spiel</button>
         </form>
+        <a href="{{ url_for('barracks') }}" style="font-size: 1.2em; padding: 0.5em 1em; text-decoration: none; background: #6c757d; color: white; border-radius: 5px;">Kaserne</a>
         <button type="button" disabled style="font-size: 1.2em; padding: 0.5em 1em; margin-top: 1em;">Spiel laden</button>
     </div>
 

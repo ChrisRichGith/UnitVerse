@@ -58,6 +58,21 @@
                     <button type="submit">Neues Spiel</button>
                 </form>
             </div>
+
+            {% if game.survivors %}
+            <div class="survivors-area" style="margin-top: 2em;">
+                <h4>Überlebende Einheiten</h4>
+                {% for unit in game.survivors %}
+                <div class="unit-card">
+                    <strong>{{ unit.name }}</strong> (XP: {{ unit.xp }})<br>
+                    <form action="/move_to_barracks/{{ unit.id }}" method="post">
+                        <button type="submit" {% if player1.barracks|length >= 3 %}disabled{% endif %}>In Kaserne verschieben</button>
+                    </form>
+                </div>
+                {% endfor %}
+                <p><small>Kaserne: {{ player1.barracks|length }}/3</small></p>
+            </div>
+            {% endif %}
         </div>
 
         <div class="player-area">
