@@ -25,7 +25,7 @@ class Player:
         self.is_ai = is_ai
         self.gold = 100 # Starting gold
         self.units = []
-        self.board = {(r, c): None for r in range(2) for c in range(3)} # 2 rows, 3 columns
+        self.board = {(r, c): None for r in range(3) for c in range(2)} # 3 rows, 2 columns
 
     def place_unit(self, unit, position):
         if self.board.get(position) is None:
@@ -35,8 +35,8 @@ class Player:
         return False
 
     def find_first_available_slot(self):
-        for r in range(2):
-            for c in range(3):
+        for r in range(3):
+            for c in range(2):
                 if self.board.get((r,c)) is None:
                     return (r,c)
         return None
@@ -78,8 +78,8 @@ class Game:
 
         # Find first available target, respecting rows (front-row protection)
         target = None
-        for r in range(2): # Iterate rows 0, 1
-            for c in range(3): # Iterate columns 0, 1, 2
+        for r in range(3): # Iterate rows 0, 1, 2
+            for c in range(2): # Iterate columns 0, 1
                 unit = opponent_player.board.get((r, c))
                 if unit and not unit.is_defeated:
                     target = unit
