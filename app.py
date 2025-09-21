@@ -299,6 +299,8 @@ def pc_shopping_ai(player, shop_units):
                 player.units.append(best_buy)
                 player.place_unit(best_buy, slot)
                 shop_units.remove(best_buy)
+                # Replenish the shop so the AI has fresh options
+                shop_units.append(generate_random_unit())
             else:
                 # No space left on board
                 break
