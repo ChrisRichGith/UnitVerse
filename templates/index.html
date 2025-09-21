@@ -31,9 +31,9 @@
             <p>Gold: {{ game.player1.gold }}</p>
             <h3>Dein Team</h3>
             <div class="board">
-            {% for r in range(3) %}
+            {% for r in range(2) %}
                 <div class="row">
-                {% for c in range(2) %}
+                {% for c in range(3) %}
                     <div class="slot">
                         {% set unit = game.player1.board[(r,c)] %}
                         {% if unit %}
@@ -71,9 +71,9 @@
         <div class="player-area">
             <h2>Spieler 1</h2>
             <div class="board">
-            {% for r in range(3) %}
+            {% for r in range(2) %}
                 <div class="row">
-                {% for c in range(2) %}
+                {% for c in range(3) %}
                     <div class="slot">
                         {% set unit = game.player1.board[(r,c)] %}
                         {% if unit %}
@@ -107,9 +107,9 @@
     <div class="player-area">
         <h2>Spieler 2</h2>
         <div class="board">
-            {% for r in range(3) %}
+            {% for r in range(2) %}
                 <div class="row">
-                {% for c in range(2) %}
+                {% for c in range(3) %}
                     <div class="slot">
                         {% set unit = game.player2.board[(r,c)] %}
                         {% if unit %}
