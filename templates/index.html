@@ -2,18 +2,75 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Kampfspiel</title>
+    <title>UnitVerse</title>
     <style>
-        body { font-family: sans-serif; display: flex; }
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; text-align: center; }
         .board { border: 1px solid black; margin: 1em; padding: 1em; }
-        .slot { border: 1px solid #eee; min-height: 50px; min-width: 80px; }
+        .slot { border: 1px solid #eee; min-height: 50px; min-width: 80px; padding: 5px; }
         .defeated { text-decoration: line-through; opacity: 0.5; }
+        .game-container, .prep-container { display: flex; align-items: flex-start; }
+        .title-screen { padding: 2em; }
+        .shop, .player-info { border: 1px solid #ccc; padding: 1em; margin: 1em; }
+        .unit-card { border: 1px solid #999; padding: 0.5em; margin-bottom: 0.5em; background: #f9f9f9; }
     </style>
 </head>
 <body>
-    <div class="player-area">
-        <h2>Spieler 1</h2>
-        <div class="board">
+    {% if game.game_state == 'title_screen' %}
+    <div class="title-screen">
+        <h1>UnitVerse</h1>
+        <form action="/start_game" method="post">
+            <button type="submit" style="font-size: 1.2em; padding: 0.5em 1em;">Spiel starten</button>
+        </form>
+        <button type="button" disabled style="font-size: 1.2em; padding: 0.5em 1em; margin-top: 1em;">Spiel laden</button>
+    </div>
+
+    {% elif game.game_state == 'preparation' %}
+    <div class="prep-container">
+        <div class="player-info">
+            <h2>Vorbereitung</h2>
+            <p>Gold: {{ game.player1.gold }}</p>
+            <h3>Dein Team</h3>
+            <div class="board">
+            {% for r in range(3) %}
+                <div class="row">
+                {% for c in range(2) %}
+                    <div class="slot">
+                        {% set unit = game.player1.board[(r,c)] %}
+                        {% if unit %}
+                            <div><strong>{{ unit.name }}</strong></div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                </div>
+            {% endfor %}
+            </div>
+        </div>
+        <div class="shop">
+            <h2>Shop</h2>
+            {% for unit in game.shop_units %}
+            <div class="unit-card">
+                <strong>{{ unit.name }}</strong><br>
+                HP: {{ unit.hp }}, Atk: {{ unit.attack }}, Init: {{ unit.initiative }}<br>
+                Kosten: {{ unit.cost }} Gold<br>
+                <form action="/buy_unit/{{ unit.id }}" method="post">
+                    <button type="submit" {% if game.player1.gold < unit.cost %}disabled{% endif %}>Kaufen</button>
+                </form>
+            </div>
+            {% endfor %}
+            <hr>
+            <form action="/start_combat" method="post">
+                <button type="submit" style="font-size: 1.2em; padding: 0.5em 1em; background: #28a745; color: white;" {% if game.player1.units|length == 0 %}disabled{% endif %}>
+                    Kampf starten
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% elif game.game_state == 'combat' or game.game_state == 'finished' %}
+    <div class="game-container">
+        <div class="player-area">
+            <h2>Spieler 1</h2>
+            <div class="board">
             {% for r in range(3) %}
                 <div class="row">
                 {% for c in range(2) %}
@@ -67,5 +124,7 @@
             {% endfor %}
         </div>
     </div>
+    </div>
+    {% endif %}
 </body>
 </html>

@@ -1,15 +1,18 @@
 import uuid
 from flask import Flask, render_template, redirect, url_for
 
+import random
+
 # --- DATA CLASSES ---
 class Unit:
-    def __init__(self, name, hp, attack, initiative):
+    def __init__(self, name, hp, attack, initiative, cost):
         self.id = str(uuid.uuid4())
         self.name = name
         self.hp = hp
         self.max_hp = hp
         self.attack = attack
         self.initiative = initiative
+        self.cost = cost
         self.is_defeated = False
         self.position = None
 
@@ -17,14 +20,26 @@ class Unit:
         return f"{self.name} (HP: {self.hp}/{self.max_hp})"
 
 class Player:
-    def __init__(self, name):
+    def __init__(self, name, is_ai=False):
         self.name = name
+        self.is_ai = is_ai
+        self.gold = 100 # Starting gold
+        self.units = []
         self.board = {(r, c): None for r in range(3) for c in range(2)}
 
     def place_unit(self, unit, position):
         if self.board.get(position) is None:
             unit.position = position
             self.board[position] = unit
+            return True
+        return False
+
+    def find_first_available_slot(self):
+        for r in range(3):
+            for c in range(2):
+                if self.board.get((r,c)) is None:
+                    return (r,c)
+        return None
 
 class Game:
     def __init__(self, player1, player2):
@@ -33,11 +48,13 @@ class Game:
         self.players = [player1, player2]
         self.turn_order = []
         self.current_turn_index = 0
-        self.game_state = "combat" # Start directly in combat for simplicity
+        self.game_state = "title_screen" # title_screen, preparation, combat, finished
+        self.shop_units = []
 
     def start_combat(self):
-        all_units = [u for p in self.players for u in p.board.values() if u]
+        all_units = [u for p in self.players for u in p.units]
         self.turn_order = sorted(all_units, key=lambda u: u.initiative, reverse=True)
+        self.game_state = "combat"
         self.current_turn_index = 0
 
     def get_current_attacker(self):
@@ -90,22 +107,27 @@ class Game:
         if p1_all_defeated or p2_all_defeated:
             self.game_state = "finished"
 
+# --- UNIT GENERATION ---
+UNIT_NAMES = ["Goblin", "Orc", "Elf", "Dwarf", "Knight", "Mage", "Rogue", "Golem"]
+
+def generate_random_unit():
+    """Generates a new random unit with balanced stats and a cost."""
+    name = random.choice(UNIT_NAMES)
+    hp = random.randint(50, 100)
+    attack = random.randint(10, 25)
+    initiative = random.randint(1, 10)
+
+    # Cost is a simple sum of stats
+    cost = int((hp / 5) + attack + initiative)
+
+    return Unit(name, hp, attack, initiative, cost)
+
 # --- GAME SETUP ---
 def setup_game():
-    """Creates a new game with a fixed set of units."""
+    """Creates a new, empty game, ready for the title screen."""
     p1 = Player(name="Spieler 1")
-    p2 = Player(name="PC")
-
-    # Player 1's units
-    p1.place_unit(Unit(name="Krieger", hp=100, attack=35, initiative=5), (0, 0))
-    p1.place_unit(Unit(name="Bogenschütze", hp=70, attack=40, initiative=7), (2, 1))
-
-    # Player 2's units
-    p2.place_unit(Unit(name="Goblin", hp=60, attack=30, initiative=8), (0, 1))
-    p2.place_unit(Unit(name="Oger", hp=120, attack=25, initiative=4), (1, 0))
-
+    p2 = Player(name="PC", is_ai=True)
     new_game = Game(p1, p2)
-    new_game.start_combat()
     return new_game
 
 # --- FLASK APP ---
@@ -123,6 +145,76 @@ def index():
 def next_turn():
     if game:
         game.execute_turn()
+    return redirect(url_for('index'))
+
+def pc_shopping_ai(player, shop_units):
+    """A simple AI for the PC to buy and place units."""
+    if not player.is_ai:
+        return
+
+    can_afford_something = True
+    while can_afford_something:
+        can_afford_something = False
+        # Find the most expensive unit the AI can afford
+        best_buy = None
+        for unit in shop_units:
+            if player.gold >= unit.cost:
+                if best_buy is None or unit.cost > best_buy.cost:
+                    best_buy = unit
+                    can_afford_something = True
+
+        if best_buy:
+            # Buy the unit
+            slot = player.find_first_available_slot()
+            if slot:
+                player.gold -= best_buy.cost
+                player.units.append(best_buy)
+                player.place_unit(best_buy, slot)
+                shop_units.remove(best_buy)
+            else:
+                # No space left on board
+                break
+
+@app.route('/start_game', methods=['POST'])
+def start_game():
+    """Prepares the game for the shopping phase."""
+    global game
+    game = setup_game() # Reset the game to a clean state
+    game.game_state = "preparation"
+    # Populate the shop with 5 random units
+    game.shop_units = [generate_random_unit() for _ in range(5)]
+
+    # PC opponent does its shopping
+    pc_shopping_ai(game.player2, game.shop_units)
+
+    return redirect(url_for('index'))
+
+@app.route('/buy_unit/<unit_id>', methods=['POST'])
+def buy_unit(unit_id):
+    """Handles the player buying a unit from the shop."""
+    if game and game.game_state == "preparation":
+        player = game.player1
+
+        # Find the unit in the shop
+        unit_to_buy = next((u for u in game.shop_units if u.id == unit_id), None)
+
+        if unit_to_buy and player.gold >= unit_to_buy.cost:
+            # Check if there is space on the board
+            slot = player.find_first_available_slot()
+            if slot:
+                # Process purchase
+                player.gold -= unit_to_buy.cost
+                player.units.append(unit_to_buy)
+                player.place_unit(unit_to_buy, slot)
+                game.shop_units.remove(unit_to_buy)
+
+    return redirect(url_for('index'))
+
+@app.route('/start_combat', methods=['POST'])
+def start_combat():
+    """Transitions the game from preparation to combat."""
+    if game and game.game_state == "preparation":
+        game.start_combat()
     return redirect(url_for('index'))
 
 @app.route('/new_game', methods=['POST'])
