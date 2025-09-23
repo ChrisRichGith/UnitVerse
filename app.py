@@ -288,10 +288,12 @@ def pc_shopping_ai(player, shop_units):
                 slot = player.find_first_available_slot()
                 if not slot: break # Should not happen due to while loop, but for safety
 
-                # Buy the first affordable unit
+                # Buy a copy of the first affordable unit to prevent state issues
                 player.gold -= unit.cost
-                player.units.append(unit)
-                player.place_unit(unit, slot)
+                bought_unit_copy = Unit.from_dict(unit.to_dict())
+                player.units.append(bought_unit_copy)
+                player.place_unit(bought_unit_copy, slot)
+
                 shop_units.remove(unit)
                 shop_units.append(generate_random_unit())
 
