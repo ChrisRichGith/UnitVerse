@@ -322,8 +322,15 @@ def start_game():
     game = Game(p1, p2)
     game.game_state = "preparation"
     game.shop_units = [generate_random_unit() for _ in range(5)]
-    # AI selects its full team from barracks and shop
-    ai_select_team(game.player2, game.shop_units)
+    # AI team selection is now triggered manually by the user for debugging
+    # ai_select_team(game.player2, game.shop_units)
+    return redirect(url_for('index'))
+
+@app.route('/ai_shopping_phase', methods=['POST'])
+def ai_shopping_phase():
+    """Manual trigger for the AI to select its team for debugging."""
+    if game and game.game_state == "preparation":
+        ai_select_team(game.player2, game.shop_units)
     return redirect(url_for('index'))
 
 @app.route('/deploy_unit/<unit_id>', methods=['POST'])
