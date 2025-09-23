@@ -333,6 +333,20 @@ def ai_shopping_phase():
         ai_select_team(game.player2, game.shop_units)
     return redirect(url_for('index'))
 
+@app.route('/force_ai_team', methods=['POST'])
+def force_ai_team():
+    """Places a single hardcoded unit on the AI's board for debugging."""
+    if game and game.game_state == "preparation":
+        ai_player = game.player2
+        # Clear board and units
+        ai_player.units = []
+        ai_player.board = {(r, c): None for r in range(3) for c in range(2)}
+        # Create and place a single goblin
+        goblin = Unit(name="Test-Goblin", hp=50, attack=10, initiative=5, cost=30)
+        ai_player.units.append(goblin)
+        ai_player.place_unit(goblin, (0, 0))
+    return redirect(url_for('index'))
+
 @app.route('/deploy_unit/<unit_id>', methods=['POST'])
 def deploy_unit(unit_id):
     """Handles the player deploying a unit from the barracks."""

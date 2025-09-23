@@ -82,8 +82,11 @@
                     </div>
                 {% endfor %}{% endfor %}
             </div>
-            <form action="/ai_shopping_phase" method="post" style="margin-top: 1em;">
+            <form action="/ai_shopping_phase" method="post" style="margin-top: 1em; display: inline-block;">
                 <button type="submit">KI einkaufen lassen</button>
+            </form>
+            <form action="/force_ai_team" method="post" style="margin-top: 1em; display: inline-block;">
+                <button type="submit" style="background-color: #ffc107;">KI-Team erzwingen (Test)</button>
             </form>
         </div>
 
