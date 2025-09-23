@@ -255,53 +255,49 @@ def barracks():
     return render_template('barracks.html', player1=players['Spieler 1'])
 
 def ai_select_team(player, shop_units):
-    """AI first deploys units from its barracks, then buys from the shop."""
+    """
+    AI selects its team by first deploying from barracks, then buying from the shop.
+    This function is completely rewritten to be robust and clear.
+    """
     if not player.is_ai:
         return
 
-    # Deploy from barracks first (strongest first)
+    # 1. Deploy from barracks
     barracks_sorted = sorted(player.barracks, key=lambda u: u.xp, reverse=True)
     for unit in barracks_sorted:
         slot = player.find_first_available_slot()
         if slot:
-            # Add a copy to the active units list, don't remove from barracks
             deployed_unit = Unit.from_dict(unit.to_dict())
             player.units.append(deployed_unit)
             player.place_unit(deployed_unit, slot)
         else:
-            break # No more space
+            break  # No more space
 
-    # Then, buy from shop
-    pc_shopping_ai(player, shop_units)
-
-def pc_shopping_ai(player, shop_units):
-    """A simple AI for the PC to buy and place units. (Simplified for debugging)"""
-    if not player.is_ai:
-        return
-
-    # Continue buying as long as there is gold and space
+    # 2. Buy from shop
     while player.find_first_available_slot() is not None:
-        bought_a_unit = False
-        # Iterate over a copy of the list as we might modify it
+        bought_something = False
         for unit in list(shop_units):
             if player.gold >= unit.cost:
+                # Find the first available slot again in case the board is now full
                 slot = player.find_first_available_slot()
-                if not slot: break # Should not happen due to while loop, but for safety
+                if not slot:
+                    break # Board is full
 
-                # Buy a copy of the first affordable unit to prevent state issues
-                player.gold -= unit.cost
+                # Buy a copy of the unit
                 bought_unit_copy = Unit.from_dict(unit.to_dict())
+                player.gold -= bought_unit_copy.cost
                 player.units.append(bought_unit_copy)
                 player.place_unit(bought_unit_copy, slot)
 
+                # Replenish the shop
                 shop_units.remove(unit)
                 shop_units.append(generate_random_unit())
 
-                bought_a_unit = True
-                break # Break from the for loop to restart the buying process
+                bought_something = True
+                break  # Restart the scan from the beginning of the shop
 
-        # If we went through the whole shop and couldn't afford anything, stop.
-        if not bought_a_unit:
+        if not bought_something:
+            # Can't afford anything in the current shop, so stop.
             break
 
 @app.route('/start_game', methods=['POST'])
@@ -322,29 +318,8 @@ def start_game():
     game = Game(p1, p2)
     game.game_state = "preparation"
     game.shop_units = [generate_random_unit() for _ in range(5)]
-    # AI team selection is now triggered manually by the user for debugging
-    # ai_select_team(game.player2, game.shop_units)
-    return redirect(url_for('index'))
-
-@app.route('/ai_shopping_phase', methods=['POST'])
-def ai_shopping_phase():
-    """Manual trigger for the AI to select its team for debugging."""
-    if game and game.game_state == "preparation":
-        ai_select_team(game.player2, game.shop_units)
-    return redirect(url_for('index'))
-
-@app.route('/force_ai_team', methods=['POST'])
-def force_ai_team():
-    """Places a single hardcoded unit on the AI's board for debugging."""
-    if game and game.game_state == "preparation":
-        ai_player = game.player2
-        # Clear board and units
-        ai_player.units = []
-        ai_player.board = {(r, c): None for r in range(3) for c in range(2)}
-        # Create and place a single goblin
-        goblin = Unit(name="Test-Goblin", hp=50, attack=10, initiative=5, cost=30)
-        ai_player.units.append(goblin)
-        ai_player.place_unit(goblin, (0, 0))
+    # AI selects its full team from barracks and shop
+    ai_select_team(game.player2, game.shop_units)
     return redirect(url_for('index'))
 
 @app.route('/deploy_unit/<unit_id>', methods=['POST'])
