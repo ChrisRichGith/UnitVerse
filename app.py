@@ -174,20 +174,20 @@ class Game:
                 unit.xp += p1_xp_award
                 self.survivors.append(unit)
 
-        # Identify AI survivors separately for AI barracks management
-        ai_survivors = []
-        for unit in self.player2.units:
-            if not unit.is_defeated:
-                unit.xp += p2_xp_award
-                ai_survivors.append(unit)
-
-        # This is a temporary list for the AI to process, not for display
-        self.ai_survivors = ai_survivors
+        # AI does not get XP or survivors
+        pass
 
 # --- PERSISTENCE ---
 SAVE_FILE = "game_data.json"
 def save_data(players_dict):
-    data_to_save = {name: p.to_dict() for name, p in players_dict.items()}
+    data_to_save = {}
+    for name, p in players_dict.items():
+        if p.is_ai:
+            # AI has no persistence
+            data_to_save[name] = {'name': p.name, 'barracks': []}
+        else:
+            data_to_save[name] = p.to_dict()
+
     with open(SAVE_FILE, "w") as f:
         json.dump(data_to_save, f, indent=4)
 
@@ -198,7 +198,11 @@ def load_data():
     with open(SAVE_FILE, "r") as f:
         try:
             data = json.load(f)
-            return {name: Player.from_dict(p_data) for name, p_data in data.items()}
+            players_loaded = {name: Player.from_dict(p_data) for name, p_data in data.items()}
+            # Ensure AI starts with a fresh, empty barracks regardless of save file
+            if 'PC' in players_loaded:
+                players_loaded['PC'].barracks = []
+            return players_loaded
         except (json.JSONDecodeError, KeyError):
             return {"Spieler 1": Player(name="Spieler 1"), "PC": Player(name="PC", is_ai=True)}
 
@@ -212,36 +216,9 @@ def generate_random_unit():
     cost = int((hp / 5) + attack + initiative)
     return Unit(name, hp, attack, initiative, cost)
 
-def ai_perform_upgrades(player):
-    """Checks for and performs any available upgrades for an AI player."""
-    if not player.is_ai:
-        return False # No changes made
-
-    upgraded = False
-    for unit in player.barracks:
-        xp_needed = unit.level * 100
-        if unit.xp >= xp_needed:
-            upgraded = True
-            unit.xp -= xp_needed
-            unit.level += 1
-            stats_to_upgrade = ["max_hp", "attack", "initiative"]
-            upgrades = random.sample(stats_to_upgrade, 2)
-            for stat in upgrades:
-                if stat == "max_hp":
-                    unit.max_hp += 10
-                    unit.hp = unit.max_hp # Heal to new max
-                elif stat == "attack":
-                    unit.attack += 2
-                elif stat == "initiative":
-                    unit.initiative += 1
-    return upgraded
-
 # --- FLASK APP ---
 app = Flask(__name__)
 players = load_data()
-# AI performs its upgrades on load
-if ai_perform_upgrades(players['PC']):
-    save_data(players)
 
 game = Game(players['Spieler 1'], players['PC'])
 
@@ -262,18 +239,7 @@ def ai_select_team(player, shop_units):
     if not player.is_ai:
         return
 
-    # 1. Deploy from barracks
-    barracks_sorted = sorted(player.barracks, key=lambda u: u.xp, reverse=True)
-    for unit in barracks_sorted:
-        slot = player.find_first_available_slot()
-        if slot:
-            deployed_unit = Unit.from_dict(unit.to_dict())
-            player.units.append(deployed_unit)
-            player.place_unit(deployed_unit, slot)
-        else:
-            break  # No more space
-
-    # 2. Buy from shop
+    # AI now only buys from the shop, it does not use barracks.
     while player.find_first_available_slot() is not None:
         bought_something = False
         for unit in list(shop_units):
@@ -370,26 +336,12 @@ def move_to_barracks(unit_id):
     # After moving a unit, redirect to the barracks to see the result
     return redirect(url_for('barracks'))
 
-def ai_manage_barracks(player, survivors):
-    """Decides which survivors to keep in the barracks for the AI."""
-    if not player.is_ai:
-        return
-
-    # Add all survivors to a pool with existing barracks units
-    pool = player.barracks + survivors
-    # Sort by XP, highest first
-    pool.sort(key=lambda u: u.xp, reverse=True)
-    # Keep the top 3
-    player.barracks = pool[:3]
-
 @app.route('/start_combat', methods=['POST'])
 def start_combat():
     if game and game.game_state == "preparation":
         game.run_full_combat()
-        # After combat, the AI manages its barracks
-        ai_player = players['PC']
-        ai_manage_barracks(ai_player, game.ai_survivors)
-        save_data(players) # Save changes for both players
+        # Only the human player's data is saved now.
+        save_data(players)
         return render_template('combat_replay.html', game=game, combat_log_json=game.combat_log, player1=players['Spieler 1'])
     return redirect(url_for('index'))
 
