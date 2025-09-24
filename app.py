@@ -98,22 +98,44 @@ class Game:
                 if attacker.is_defeated:
                     continue
 
-                opponent_player = self.player2 if attacker in self.player1.units else self.player1
-                # Find a target that is not defeated
-                target = next((u for u in opponent_player.units if not u.is_defeated), None)
+                # --- ACTION LOGIC ---
+                if attacker.class_name == 'Kleriker':
+                    # HEAL LOGIC
+                    allied_player = self.player1 if attacker in self.player1.units else self.player2
+                    # Find allies that are not defeated and not at full hp
+                    heal_candidates = [u for u in allied_player.units if not u.is_defeated and u.hp < u.max_hp]
+                    if heal_candidates:
+                        # Sort by lowest hp percentage
+                        heal_candidates.sort(key=lambda u: u.hp / u.max_hp)
+                        target = heal_candidates[0]
 
-                if target:
-                    damage = attacker.attack
-                    target.hp = max(0, target.hp - damage)
-                    log_entry = {
-                        'type': 'attack', 'attacker_id': attacker.id, 'attacker_name': attacker.class_name,
-                        'target_id': target.id, 'target_name': target.class_name, 'damage': damage,
-                        'target_hp_after': target.hp
-                    }
-                    if target.hp == 0:
-                        target.is_defeated = True
-                        log_entry['defeated'] = True
-                    self.combat_log.append(log_entry)
+                        heal_amount = 5 + attacker.attributes.get('wis', 0)
+                        original_hp = target.hp
+                        target.hp = min(target.max_hp, target.hp + heal_amount)
+
+                        log_entry = {
+                            'type': 'heal', 'healer_id': attacker.id, 'healer_name': attacker.class_name,
+                            'target_id': target.id, 'target_name': target.class_name,
+                            'heal_amount': target.hp - original_hp, 'target_hp_after': target.hp
+                        }
+                        self.combat_log.append(log_entry)
+                else:
+                    # ATTACK LOGIC
+                    opponent_player = self.player2 if attacker in self.player1.units else self.player1
+                    target = next((u for u in opponent_player.units if not u.is_defeated), None)
+
+                    if target:
+                        damage = attacker.attack
+                        target.hp = max(0, target.hp - damage)
+                        log_entry = {
+                            'type': 'attack', 'attacker_id': attacker.id, 'attacker_name': attacker.class_name,
+                            'target_id': target.id, 'target_name': target.class_name, 'damage': damage,
+                            'target_hp_after': target.hp
+                        }
+                        if target.hp == 0:
+                            target.is_defeated = True
+                            log_entry['defeated'] = True
+                        self.combat_log.append(log_entry)
 
                 if self.check_game_over():
                     break

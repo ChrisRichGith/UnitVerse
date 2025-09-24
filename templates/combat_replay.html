@@ -13,6 +13,7 @@
         .log-area { width: 40%; height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; text-align: left; margin: 1em 0;}
         .attacking { background-color: #d4edda !important; }
         .attacked { background-color: #f8d7da !important; }
+        .healing { background-color: #cce5ff !important; } /* Light blue for healing */
         #opponent-board { transform: rotate(180deg); }
         #opponent-board .unit-slot { transform: rotate(180deg); } /* Rotate content back */
     </style>
@@ -93,8 +94,8 @@
                 const p = document.createElement('p');
 
                 // Reset highlights
-                document.querySelectorAll('.attacking, .attacked').forEach(el => {
-                    el.classList.remove('attacking', 'attacked');
+            document.querySelectorAll('.attacking, .attacked, .healing').forEach(el => {
+                el.classList.remove('attacking', 'attacked', 'healing');
                 });
 
                 if (step.type === 'round') {
@@ -113,6 +114,17 @@
                             targetSlot.classList.add('defeated');
                         }
                     }
+            } else if (step.type === 'heal') {
+                p.textContent = `${step.healer_name} heilt ${step.target_name} für ${step.heal_amount} HP.`;
+                const healerSlot = document.getElementById(step.healer_id);
+                const targetSlot = document.getElementById(step.target_id);
+
+                if (healerSlot) healerSlot.classList.add('attacking'); // Use same highlight for action
+                if (targetSlot) {
+                    targetSlot.classList.add('healing');
+                    const hpSpan = targetSlot.querySelector('.hp-val');
+                    if (hpSpan) hpSpan.textContent = step.target_hp_after;
+                }
                 }
 
                 logDisplay.appendChild(p);
