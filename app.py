@@ -41,6 +41,7 @@ class Unit:
 
         self.is_defeated = False
         self.position = None
+        self.shield = 0
 
     def to_dict(self):
         return {
@@ -102,23 +103,26 @@ class Game:
                 if attacker.class_name == 'Kleriker':
                     # HEAL LOGIC
                     allied_player = self.player1 if attacker in self.player1.units else self.player2
-                    # Find allies that are not defeated and not at full hp
                     heal_candidates = [u for u in allied_player.units if not u.is_defeated and u.hp < u.max_hp]
                     if heal_candidates:
-                        # Sort by lowest hp percentage
                         heal_candidates.sort(key=lambda u: u.hp / u.max_hp)
                         target = heal_candidates[0]
-
                         heal_amount = 5 + attacker.attributes.get('wis', 0)
                         original_hp = target.hp
                         target.hp = min(target.max_hp, target.hp + heal_amount)
-
-                        log_entry = {
+                        self.combat_log.append({
                             'type': 'heal', 'healer_id': attacker.id, 'healer_name': attacker.class_name,
                             'target_id': target.id, 'target_name': target.class_name,
                             'heal_amount': target.hp - original_hp, 'target_hp_after': target.hp
-                        }
-                        self.combat_log.append(log_entry)
+                        })
+                elif attacker.class_name == 'Krieger':
+                    # SHIELD LOGIC
+                    shield_amount = 10 + attacker.attributes.get('str', 0)
+                    attacker.shield += shield_amount
+                    self.combat_log.append({
+                        'type': 'shield', 'actor_id': attacker.id, 'actor_name': attacker.class_name,
+                        'shield_amount': shield_amount, 'shield_total': attacker.shield
+                    })
                 else:
                     # ATTACK LOGIC
                     opponent_player = self.player2 if attacker in self.player1.units else self.player1
@@ -126,11 +130,20 @@ class Game:
 
                     if target:
                         damage = attacker.attack
-                        target.hp = max(0, target.hp - damage)
+
+                        # Apply damage to shield first
+                        damage_to_shield = min(target.shield, damage)
+                        target.shield -= damage_to_shield
+                        remaining_damage = damage - damage_to_shield
+
+                        # Apply remaining damage to HP
+                        original_hp = target.hp
+                        target.hp = max(0, target.hp - remaining_damage)
+
                         log_entry = {
                             'type': 'attack', 'attacker_id': attacker.id, 'attacker_name': attacker.class_name,
                             'target_id': target.id, 'target_name': target.class_name, 'damage': damage,
-                            'target_hp_after': target.hp
+                            'target_hp_after': target.hp, 'target_shield_after': target.shield
                         }
                         if target.hp == 0:
                             target.is_defeated = True

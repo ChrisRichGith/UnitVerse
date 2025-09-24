@@ -14,6 +14,7 @@
         .attacking { background-color: #d4edda !important; }
         .attacked { background-color: #f8d7da !important; }
         .healing { background-color: #cce5ff !important; } /* Light blue for healing */
+        .shielding { border: 2px solid #007bff; box-shadow: 0 0 5px #007bff; }
         #opponent-board { transform: rotate(180deg); }
         #opponent-board .unit-slot { transform: rotate(180deg); } /* Rotate content back */
     </style>
@@ -29,6 +30,7 @@
                         {% if unit %}
                             <strong>{{ unit.class_name }}</strong><br>
                             <small>HP: <span class="hp-val">{{ unit.max_hp }}</span>/{{ unit.max_hp }}</small>
+                            <div class="shield-display" style="color: #007bff; font-weight: bold;"></div>
                         {% endif %}
                     </div>
                 {% endfor %}{% endfor %}
@@ -48,6 +50,7 @@
                         {% if unit %}
                             <strong>{{ unit.class_name }}</strong><br>
                             <small>HP: <span class="hp-val">{{ unit.max_hp }}</span>/{{ unit.max_hp }}</small>
+                            <div class="shield-display" style="color: #007bff; font-weight: bold;"></div>
                         {% endif %}
                     </div>
                 {% endfor %}{% endfor %}
@@ -94,8 +97,8 @@
                 const p = document.createElement('p');
 
                 // Reset highlights
-            document.querySelectorAll('.attacking, .attacked, .healing').forEach(el => {
-                el.classList.remove('attacking', 'attacked', 'healing');
+            document.querySelectorAll('.attacking, .attacked, .healing, .shielding').forEach(el => {
+                el.classList.remove('attacking', 'attacked', 'healing', 'shielding');
                 });
 
                 if (step.type === 'round') {
@@ -109,7 +112,9 @@
                     if (targetSlot) {
                         targetSlot.classList.add('attacked');
                         const hpSpan = targetSlot.querySelector('.hp-val');
+                    const shieldSpan = targetSlot.querySelector('.shield-display');
                         if (hpSpan) hpSpan.textContent = step.target_hp_after;
+                    if (shieldSpan) shieldSpan.textContent = step.target_shield_after > 0 ? `+${step.target_shield_after} Schild` : '';
                         if (step.defeated) {
                             targetSlot.classList.add('defeated');
                         }
@@ -119,13 +124,21 @@
                 const healerSlot = document.getElementById(step.healer_id);
                 const targetSlot = document.getElementById(step.target_id);
 
-                if (healerSlot) healerSlot.classList.add('attacking'); // Use same highlight for action
+                if (healerSlot) healerSlot.classList.add('attacking');
                 if (targetSlot) {
                     targetSlot.classList.add('healing');
                     const hpSpan = targetSlot.querySelector('.hp-val');
                     if (hpSpan) hpSpan.textContent = step.target_hp_after;
                 }
+            } else if (step.type === 'shield') {
+                p.textContent = `${step.actor_name} erhält einen Schild von ${step.shield_amount}.`;
+                const actorSlot = document.getElementById(step.actor_id);
+                if (actorSlot) {
+                    actorSlot.classList.add('shielding');
+                    const shieldSpan = actorSlot.querySelector('.shield-display');
+                    if (shieldSpan) shieldSpan.textContent = `+${step.shield_total} Schild`;
                 }
+            }
 
                 logDisplay.appendChild(p);
                 logDisplay.scrollTop = logDisplay.scrollHeight; // Auto-scroll
