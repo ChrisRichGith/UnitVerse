@@ -236,17 +236,21 @@ def start_combat():
     if game.game_state != "preparation":
         return redirect(url_for('index'))
 
-    # AI gets 4 random units
+    # AI buys up to 4 units with its gold
     ai_player = game.player2
-    if not ai_player.units: # Ensure AI gets a team if it doesn't have one
-        for _ in range(4):
-            slot = next((pos for pos, unit in ai_player.board.items() if unit is None), None)
-            if slot:
-                new_unit = generate_random_unit()
-                ai_player.units.append(new_unit)
-                ai_player.board[slot] = new_unit
-            else:
-                break # AI board is full
+    if not ai_player.units:
+        attempts = 0
+        while len(ai_player.units) < 4 and attempts < 20: # Limit attempts to prevent infinite loops
+            new_unit = generate_random_unit()
+            if ai_player.gold >= new_unit.cost:
+                slot = next((pos for pos, unit in ai_player.board.items() if unit is None), None)
+                if slot:
+                    ai_player.gold -= new_unit.cost
+                    ai_player.units.append(new_unit)
+                    ai_player.board[slot] = new_unit
+                else:
+                    break # AI board is full
+            attempts += 1
 
     game.run_full_combat()
 
