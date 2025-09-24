@@ -2,133 +2,77 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>UnitVerse</title>
+    <title>UnitVerse - Neuanfang</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; text-align: center; }
-        .board {
-            border: 1px solid black;
-            margin: 1em;
-            padding: 1em;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr); /* 2 columns */
-            grid-template-rows: repeat(3, 1fr);    /* 3 rows */
-            gap: 5px;
-        }
-        .slot { border: 1px solid #eee; min-height: 60px; min-width: 90px; padding: 5px; }
-        .defeated { text-decoration: line-through; opacity: 0.5; }
-        .game-container, .prep-container { display: flex; align-items: flex-start; }
-        .title-screen { padding: 2em; }
-        .shop, .player-info { border: 1px solid #ccc; padding: 1em; margin: 1em; }
-        .unit-card { border: 1px solid #999; padding: 0.5em; margin-bottom: 0.5em; background: #f9f9f9; }
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; text-align: center; height: 100vh; margin: 0; }
+        .title-screen { padding: 2em; border: 1px solid #ccc; border-radius: 10px; }
+        button { font-size: 1.2em; padding: 0.5em 1em; margin: 0.5em; cursor: pointer; }
+        button:disabled { cursor: not-allowed; opacity: 0.5; }
     </style>
 </head>
 <body>
     {% if game.game_state == 'title_screen' %}
     <div class="title-screen">
         <h1>UnitVerse</h1>
-        <form action="/start_game" method="post" style="margin-bottom: 1em;">
-            <button type="submit" style="font-size: 1.2em; padding: 0.5em 1em;">Neues Spiel</button>
+        <form action="/start_game" method="post">
+            <button type="submit">Spiel starten</button>
         </form>
-        <a href="{{ url_for('barracks') }}" style="font-size: 1.2em; padding: 0.5em 1em; text-decoration: none; background: #6c757d; color: white; border-radius: 5px;">Kaserne</a>
-        <button type="button" disabled style="font-size: 1.2em; padding: 0.5em 1em; margin-top: 1em;">Spiel laden</button>
+        <form action="/load_game" method="post" style="display: inline;">
+            <button type="submit" {% if not save_exists %}disabled{% endif %}>Spiel laden</button>
+        </form>
+        <a href="{{ url_for('barracks') }}"><button>Kaserne</button></a>
     </div>
-
     {% elif game.game_state == 'preparation' %}
-    <div class="prep-container" style="width: 100%; justify-content: space-evenly;">
+    <div class="prep-container" style="display: flex; width: 100%; justify-content: space-around; align-items: flex-start;">
         <div class="barracks-panel" style="width: 25%;">
             <h3>Kaserne</h3>
-            {% for unit in player1.barracks %}
-                <div class="unit-card">
-                    <strong>{{ unit.name }} (Lvl {{ unit.level }})</strong><br>
-                    HP:{{ unit.max_hp }}, Atk:{{ unit.attack }}<br>
-                    <form action="/deploy_unit/{{ unit.id }}" method="post">
-                        <button type="submit" {% if unit.id in game.deployed_barracks_units %}disabled{% endif %}>Einsetzen</button>
-                    </form>
-                </div>
-            {% endfor %}
-            {% if not player1.barracks %} <p>Leer</p> {% endif %}
+            {% if game.player1.barracks %}
+                {% for unit in game.player1.barracks %}
+                    <div class="unit-card" style="border: 1px solid #999; padding: 10px; margin-bottom: 10px; background: #f9f9f9;">
+                        <strong>{{ unit.name }} (Lvl {{ unit.level }})</strong><br>
+                        HP:{{ unit.max_hp }}, Atk:{{ unit.attack }}<br>
+                        <form action="/deploy_unit/{{ unit.id }}" method="post">
+                            <button type="submit">Einsetzen</button>
+                        </form>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>Leer</p>
+            {% endif %}
         </div>
-
         <div class="team-panel" style="width: 40%;">
             <h2>Team-Zusammenstellung</h2>
-            <p>Gold: {{ player1.gold }}</p>
-            <div class="board">
+            <p>Gold: {{ game.player1.gold }}</p>
+            <div class="board" style="display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); gap: 5px; border: 1px solid black; padding: 10px; min-height: 200px;">
                 {% for r in range(3) %}{% for c in range(2) %}
-                    <div class="slot">
-                    {% set unit = player1.board.get((r,c)) %}
+                    <div class="slot" style="border: 1px solid #eee; padding: 5px;">
+                    {% set unit = game.player1.board.get((r,c)) %}
                     {% if unit %}
-                        <strong>{{ unit.name }}</strong>
+                        <strong>{{ unit.name }}</strong><br>
+                        <small>HP: {{ unit.hp }}</small>
+                    {% else %}
+                        (Leer)
                     {% endif %}
                     </div>
                 {% endfor %}{% endfor %}
             </div>
             <form action="/start_combat" method="post" style="margin-top: 1em;">
-                <button type="submit" style="font-size: 1.2em; padding: 0.5em 1em; background: #28a745; color: white;" {% if player1.units|length == 0 %}disabled{% endif %}>
-                    Kampf starten
-                </button>
+                <button type="submit">Kauf beenden & Kampf starten</button>
             </form>
         </div>
-
-        <div class="shop-panel" style="width: 25%;">
+        <div class="shop-panel" style="width: 45%;">
             <h3>Shop</h3>
             {% for unit in game.shop_units %}
-            <div class="unit-card">
+            <div class="unit-card" style="border: 1px solid #999; padding: 10px; margin-bottom: 10px; background: #f9f9f9;">
                 <strong>{{ unit.name }}</strong><br>
-                HP:{{ unit.hp }}, Atk:{{ unit.attack }}<br>
+                HP:{{ unit.hp }}, Atk:{{ unit.attack }}, Init:{{ unit.initiative }}<br>
                 Kosten: {{ unit.cost }} Gold<br>
                 <form action="/buy_unit/{{ unit.id }}" method="post">
-                    <button type="submit" {% if player1.gold < unit.cost %}disabled{% endif %}>Kaufen</button>
+                    <button type="submit" {% if game.player1.gold < unit.cost %}disabled{% endif %}>Kaufen</button>
                 </form>
             </div>
             {% endfor %}
         </div>
-    </div>
-
-    {% elif game.game_state == 'combat' %}
-    {# This state is no longer rendered directly, but we'll keep the block for future use #}
-    <div class="game-container">
-        <div class="player-area">
-            <h2>Spieler 1</h2>
-            <div class="board">
-            {% for r in range(3) %}
-                {% for c in range(2) %}
-                    <div class="slot">
-                        {% set unit = game.player1.board.get((r,c)) %}
-                        {% if unit %}
-                            <div class="{{ 'defeated' if unit.is_defeated else '' }}">
-                                <strong>{{ unit.name }}</strong><br>
-                                HP: {{ unit.hp }}/{{ unit.max_hp }}
-                            </div>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            {% endfor %}
-            </div>
-        </div>
-
-    <div class="info-area">
-        <h2>Info</h2>
-        {# This section is now empty as combat is handled in the replay view #}
-    </div>
-
-    <div class="player-area">
-        <h2>Spieler 2</h2>
-        <div class="board">
-            {% for r in range(3) %}
-                {% for c in range(2) %}
-                    <div class="slot">
-                        {% set unit = game.player2.board.get((r,c)) %}
-                        {% if unit %}
-                            <div class="{{ 'defeated' if unit.is_defeated else '' }}">
-                                <strong>{{ unit.name }}</strong><br>
-                                HP: {{ unit.hp }}/{{ unit.max_hp }}
-                            </div>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            {% endfor %}
-        </div>
-    </div>
     </div>
     {% endif %}
 </body>

@@ -2,33 +2,17 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>UnitVerse - Kampf</title>
+    <title>Kampf-Wiedergabe</title>
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; text-align: center; }
-        .board {
-            border: 1px solid black; margin: 1em; padding: 1em; display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            gap: 5px;
-        }
-        .slot { border: 1px solid #eee; min-height: 80px; min-width: 120px; padding: 5px; position: relative; }
-        .unit {
-            background: #e0f7fa; border: 1px solid #00796b; border-radius: 5px; padding: 5px; height: 100%;
-            transition: transform 0.3s ease-in-out;
-            position: relative;
-            z-index: 1;
-        }
-        .unit.p2 { background: #ffcdd2; border-color: #c62828; }
-        .unit.attacking-right { transform: translateX(40px) scale(1.1); z-index: 10; }
-        .unit.attacking-left { transform: translateX(-40px) scale(1.1); z-index: 10; }
-        .defeated { text-decoration: line-through; opacity: 0.5; }
-        .game-container { display: flex; align-items: flex-start; }
-        .info-area { padding: 1em; width: 300px; }
-        .damage-popup { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 1.5em; color: red; font-weight: bold; animation: fadeUp 1s forwards; }
-        @keyframes fadeUp {
-            from { opacity: 1; transform: translate(-50%, 0); }
-            to { opacity: 0; transform: translate(-50%, -30px); }
-        }
+        .game-container { display: flex; align-items: flex-start; justify-content: space-around; width: 100%; }
+        .player-area { width: 40%; }
+        .board { display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); gap: 5px; border: 1px solid black; padding: 10px; min-height: 200px; }
+        .unit-slot { border: 1px solid #eee; padding: 5px; min-height: 80px; transition: background-color 0.2s; }
+        .unit-slot.defeated { background-color: #e0e0e0; text-decoration: line-through; opacity: 0.6; }
+        .log-area { width: 15%; height: 400px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; text-align: left;}
+        .attacking { background-color: #d4edda !important; }
+        .attacked { background-color: #f8d7da !important; }
     </style>
 </head>
 <body>
@@ -36,133 +20,102 @@
         <div class="player-area">
             <h2>{{ game.player1.name }}</h2>
             <div class="board">
-            {% for r in range(3) %}{% for c in range(2) %}
-                <div class="slot">
+                {% for r in range(3) %}{% for c in range(2) %}
                     {% set unit = game.player1.board.get((r,c)) %}
-                    {% if unit %}
-                        <div class="unit" id="unit-{{ unit.id }}">
+                    <div class="unit-slot" id="{{ unit.id if unit else '' }}">
+                        {% if unit %}
                             <strong>{{ unit.name }}</strong><br>
-                            HP: <span class="hp-val">{{ unit.hp }}</span>/{{ unit.max_hp }}
-                        </div>
-                    {% endif %}
-                </div>
-            {% endfor %}{% endfor %}
+                            <small>HP: <span class="hp-val">{{ unit.hp }}</span>/{{ unit.max_hp }}</small>
+                        {% endif %}
+                    </div>
+                {% endfor %}{% endfor %}
             </div>
         </div>
 
-        <div class="info-area">
-            <h2 id="info-title">Kampf läuft...</h2>
-            <div id="winner-display" style="display: none;">
-                <h3></h3>
-                <form action="/new_game" method="post">
-                    <button type="submit">Neues Spiel</button>
-                </form>
-            </div>
-
-            {% if game.survivors %}
-            <div id="survivors-area" class="survivors-area" style="margin-top: 2em; display: none;">
-                <h4>Überlebende Einheiten</h4>
-                {% for unit in game.survivors %}
-                <div class="unit-card">
-                    <strong>{{ unit.name }}</strong> (XP: {{ unit.xp }})<br>
-                    <form action="/move_to_barracks/{{ unit.id }}" method="post">
-                        <button type="submit" {% if player1.barracks|length >= 3 %}disabled{% endif %}>In Kaserne verschieben</button>
-                    </form>
-                </div>
-                {% endfor %}
-                <p><small>Kaserne: {{ player1.barracks|length }}/3</small></p>
-            </div>
-            {% endif %}
+        <div class="log-area" id="combat-log-display">
+            <h3>Kampf Log</h3>
         </div>
 
         <div class="player-area">
             <h2>{{ game.player2.name }}</h2>
             <div class="board">
-            {% for r in range(3) %}{% for c in range(2) %}
-                <div class="slot">
+                {% for r in range(3) %}{% for c in range(2) %}
                     {% set unit = game.player2.board.get((r,c)) %}
-                    {% if unit %}
-                        <div class="unit p2" id="unit-{{ unit.id }}">
+                    <div class="unit-slot" id="{{ unit.id if unit else '' }}">
+                        {% if unit %}
                             <strong>{{ unit.name }}</strong><br>
-                            HP: <span class="hp-val">{{ unit.hp }}</span>/{{ unit.max_hp }}
-                        </div>
-                    {% endif %}
-                </div>
-            {% endfor %}{% endfor %}
+                            <small>HP: <span class="hp-val">{{ unit.hp }}</span>/{{ unit.max_hp }}</small>
+                        {% endif %}
+                    </div>
+                {% endfor %}{% endfor %}
             </div>
         </div>
     </div>
 
+    <div id="results-area" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 2px solid black; padding: 2em; display: none; text-align: left;">
+        <h2>Kampf beendet!</h2>
+        <h3>Sieger: {{ game.winner }}</h3>
+
+        {% if game.winner == game.player1.name and game.survivors %}
+            <h4>Überlebende Einheiten:</h4>
+            {% for unit in game.survivors %}
+                <div class="survivor-card" style="margin-bottom: 1em;">
+                    <strong>{{ unit.name }}</strong> (HP: {{ unit.hp }}/{{ unit.max_hp }})<br>
+                    <form action="/move_to_barracks/{{ unit.id }}" method="post" style="display: inline;">
+                        <button type="submit">In Kaserne verschieben</button>
+                    </form>
+                </div>
+            {% endfor %}
+        {% endif %}
+        <br>
+        <a href="{{ url_for('index') }}" style="margin-top: 1em; display: inline-block;">Zurück zum Hauptmenü</a>
+    </div>
+
     <script>
-        const combatLog = {{ combat_log_json|tojson }};
-        const winnerData = {{ game.winner|tojson }};
-        const player1Id = "{{ game.player1.id }}"; // Assuming player has an id, for now we check name
-        const player1Name = "{{ game.player1.name }}";
+        const combatLog = JSON.parse('{{ combat_log_json|safe }}');
+        const logDisplay = document.getElementById('combat-log-display');
+        let currentStep = 0;
 
-        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+        function processNextStep() {
+            if (currentStep >= combatLog.length) {
+                document.getElementById('results-area').style.display = 'block';
+                return;
+            }
 
-        function showDamage(targetElement, damage) {
-            const damageEl = document.createElement('span');
-            damageEl.className = 'damage-popup';
-            damageEl.textContent = `-${damage}`;
-            targetElement.parentElement.appendChild(damageEl);
-            setTimeout(() => damageEl.remove(), 1000);
-        }
+            const step = combatLog[currentStep];
+            const p = document.createElement('p');
 
-        async function playCombat() {
-            const infoTitle = document.getElementById('info-title');
+            // Reset highlights
+            document.querySelectorAll('.attacking, .attacked').forEach(el => {
+                el.classList.remove('attacking', 'attacked');
+            });
 
-            for (const action of combatLog) {
-                if (action.type === 'round') {
-                    infoTitle.textContent = `Runde ${action.number}`;
-                    await sleep(1000);
-                } else if (action.type === 'attack') {
-                    const attackerEl = document.getElementById(`unit-${action.attacker_id}`);
-                    const targetEl = document.getElementById(`unit-${action.target_id}`);
+            if (step.type === 'round') {
+                p.innerHTML = `<strong>--- Runde ${step.number} ---</strong>`;
+            } else if (step.type === 'attack') {
+                p.textContent = `${step.attacker_name} greift ${step.target_name} für ${step.damage} Schaden an.`;
+                const attackerSlot = document.getElementById(step.attacker_id);
+                const targetSlot = document.getElementById(step.target_id);
 
-                    if (attackerEl && targetEl) {
-                        // Animate attack
-                        const isPlayer1Attacker = attackerEl.closest('.player-area').querySelector('h2').textContent === player1Name;
-                        const attackClass = isPlayer1Attacker ? 'attacking-right' : 'attacking-left';
-                        attackerEl.classList.add(attackClass);
-
-                        await sleep(400); // Wait for animation to play out a bit
-
-                        showDamage(targetEl, action.damage);
-                        const hpEl = targetEl.querySelector('.hp-val');
-                        hpEl.textContent = action.target_hp_after;
-
-                        if (action.defeated) {
-                            targetEl.classList.add('defeated');
-                        }
-
-                        await sleep(400); // Cooldown before resetting animation
-                        attackerEl.classList.remove(attackClass);
-                        await sleep(800); // Wait before next turn
+                if (attackerSlot) attackerSlot.classList.add('attacking');
+                if (targetSlot) {
+                    targetSlot.classList.add('attacked');
+                    const hpSpan = targetSlot.querySelector('.hp-val');
+                    if (hpSpan) hpSpan.textContent = step.target_hp_after;
+                    if (step.defeated) {
+                        targetSlot.classList.add('defeated');
                     }
                 }
             }
 
-            // Show winner
-            infoTitle.style.display = 'none';
-            const winnerDisplay = document.getElementById('winner-display');
-            const winnerH3 = winnerDisplay.querySelector('h3');
-            if (winnerData === 'Unentschieden') {
-                winnerH3.textContent = 'Ergebnis: Unentschieden!';
-            } else {
-                winnerH3.textContent = `Gewinner: ${winnerData.name}!`;
-            }
-            winnerDisplay.style.display = 'block';
-
-            // Show the survivors section
-            const survivorsArea = document.getElementById('survivors-area');
-            if (survivorsArea) {
-                survivorsArea.style.display = 'block';
-            }
+            logDisplay.appendChild(p);
+            logDisplay.scrollTop = logDisplay.scrollHeight; // Auto-scroll
+            currentStep++;
+            setTimeout(processNextStep, 700); // 0.7 second delay between steps
         }
 
-        // Auto-start the combat replay when the page loads
-        window.onload = playCombat;
+        // Start the combat animation
+        setTimeout(processNextStep, 1000);
     </script>
 </body>
 </html>
