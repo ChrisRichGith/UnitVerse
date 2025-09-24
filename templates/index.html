@@ -37,7 +37,7 @@
             {% if game.player1.barracks %}
                 {% for unit in game.player1.barracks %}
                     <div class="unit-card">
-                        <strong>{{ unit.name }} (Lvl {{ unit.level }})</strong><br>
+                        <strong>{{ unit.class_name }} (Lvl {{ unit.level }})</strong><br>
                         HP:{{ unit.max_hp }}, Atk:{{ unit.attack }}<br>
                         <form action="/deploy_unit/{{ unit.id }}" method="post">
                             <button type="submit">Einsetzen</button>
@@ -65,7 +65,7 @@
                         <div class="slot">
                         {% set unit = game.player1.board.get((r,c)) %}
                         {% if unit %}
-                            <strong>{{ unit.name }}</strong><br>
+                            <strong>{{ unit.class_name }}</strong><br>
                             <small>HP: {{ unit.hp }}</small>
                         {% else %}
                             (Leer)
@@ -82,9 +82,9 @@
         <div class="side-panel">
             <h3>Shop</h3>
             {% for unit in game.shop_units %}
-            <div class="unit-card" style="border: 1px solid #999; padding: 10px; margin-bottom: 10px; background: #f9f9f9;">
-                <strong>{{ unit.name }}</strong><br>
-                HP:{{ unit.hp }}, Atk:{{ unit.attack }}, Init:{{ unit.initiative }}<br>
+            <div class="unit-card">
+                <strong>{{ unit.class_name }}</strong><br>
+                HP:{{ unit.max_hp }}, Atk:{{ unit.attack }}, Init:{{ unit.initiative }}<br>
                 Kosten: {{ unit.cost }} Gold<br>
                 <form action="/buy_unit/{{ unit.id }}" method="post">
                     <button type="submit" {% if game.player1.gold < unit.cost %}disabled{% endif %}>Kaufen</button>

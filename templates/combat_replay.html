@@ -26,7 +26,7 @@
                     {% set unit = game.player2.board.get((r,c)) %}
                     <div class="unit-slot" id="{{ unit.id if unit else '' }}">
                         {% if unit %}
-                            <strong>{{ unit.name }}</strong><br>
+                            <strong>{{ unit.class_name }}</strong><br>
                             <small>HP: <span class="hp-val">{{ unit.max_hp }}</span>/{{ unit.max_hp }}</small>
                         {% endif %}
                     </div>
@@ -45,7 +45,7 @@
                     {% set unit = game.player1.board.get((r,c)) %}
                     <div class="unit-slot" id="{{ unit.id if unit else '' }}">
                         {% if unit %}
-                            <strong>{{ unit.name }}</strong><br>
+                            <strong>{{ unit.class_name }}</strong><br>
                             <small>HP: <span class="hp-val">{{ unit.max_hp }}</span>/{{ unit.max_hp }}</small>
                         {% endif %}
                     </div>
@@ -62,7 +62,7 @@
             <h4>Überlebende Einheiten:</h4>
             {% for unit in game.survivors %}
                 <div class="survivor-card" style="margin-bottom: 1em;">
-                    <strong>{{ unit.name }}</strong> (HP: {{ unit.hp }}/{{ unit.max_hp }})<br>
+                    <strong>{{ unit.class_name }}</strong> (HP: {{ unit.hp }}/{{ unit.max_hp }})<br>
                     <form action="/move_to_barracks/{{ unit.id }}" method="post" style="display: inline;">
                         <button type="submit">In Kaserne verschieben</button>
                     </form>

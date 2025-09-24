@@ -7,33 +7,56 @@ import random
 # --- DATA CLASSES ---
 
 class Unit:
-    def __init__(self, name, hp, attack, initiative, cost, xp=0, level=1, unit_id=None):
+    def __init__(self, attributes, level=1, xp=0, unit_id=None):
         self.id = unit_id if unit_id else str(uuid.uuid4())
-        self.name = name
         self.level = level
-        self.hp = hp
-        self.max_hp = hp
-        self.attack = attack
-        self.initiative = initiative
-        self.cost = cost
         self.xp = xp
+        self.attributes = attributes # e.g. {'str': 10, 'dex': 12, ...}
+
+        # Determine class name
+        # Find the attribute with the highest value
+        primary_stat = max(self.attributes, key=self.attributes.get)
+        class_map = {
+            'str': 'Krieger', 'dex': 'Schurke', 'con': 'Barbar',
+            'int': 'Magier', 'wis': 'Kleriker', 'cha': 'Barde'
+        }
+        self.class_name = class_map.get(primary_stat, 'Abenteurer')
+
+        # Derive combat stats from attributes
+        self.max_hp = 50 + (self.attributes.get('con', 0) * 5)
+        self.hp = self.max_hp
+        self.initiative = self.attributes.get('dex', 0)
+
+        if self.class_name in ['Krieger', 'Barbar']:
+            self.attack = 5 + self.attributes.get('str', 0)
+        elif self.class_name in ['Schurke']:
+            self.attack = 5 + self.attributes.get('dex', 0)
+        elif self.class_name in ['Magier', 'Kleriker', 'Barde']:
+            self.attack = 5 + self.attributes.get('int', 0)
+        else:
+            self.attack = 5
+
+        # Calculate cost based on sum of attributes
+        self.cost = sum(self.attributes.values())
+
         self.is_defeated = False
         self.position = None
 
     def to_dict(self):
         return {
-            "id": self.id, "name": self.name, "level": self.level, "hp": self.hp,
-            "max_hp": self.max_hp, "attack": self.attack, "initiative": self.initiative,
-            "cost": self.cost, "xp": self.xp
+            "id": self.id,
+            "level": self.level,
+            "xp": self.xp,
+            "attributes": self.attributes,
         }
 
     @classmethod
     def from_dict(cls, data):
-        # This is a simple factory method to create a Unit from a dictionary
         return Unit(
-            unit_id=data.get("id"), name=data.get("name"), level=data.get("level", 1),
-            hp=data.get("hp"), attack=data.get("attack"), initiative=data.get("initiative"),
-            cost=data.get("cost"), xp=data.get("xp", 0)
+            attributes=data.get("attributes"),
+            level=data.get("level", 1),
+            xp=data.get("xp", 0),
+            unit_id=data.get("id"),
         )
 
 class Player:
@@ -79,8 +102,8 @@ class Game:
                     damage = attacker.attack
                     target.hp = max(0, target.hp - damage)
                     log_entry = {
-                        'type': 'attack', 'attacker_id': attacker.id, 'attacker_name': attacker.name,
-                        'target_id': target.id, 'target_name': target.name, 'damage': damage,
+                        'type': 'attack', 'attacker_id': attacker.id, 'attacker_name': attacker.class_name,
+                        'target_id': target.id, 'target_name': target.class_name, 'damage': damage,
                         'target_hp_after': target.hp
                     }
                     if target.hp == 0:
@@ -133,14 +156,17 @@ class Game:
                     self.survivors.append(unit)
 
 # --- UNIT GENERATION ---
-UNIT_NAMES = ["Goblin", "Orc", "Elf", "Dwarf", "Knight", "Mage", "Rogue", "Golem"]
 def generate_random_unit():
-    name = random.choice(UNIT_NAMES)
-    hp = random.randint(50, 100)
-    attack = random.randint(10, 25)
-    initiative = random.randint(1, 10)
-    cost = int((hp / 5) + attack + initiative)
-    return Unit(name, hp, attack, initiative, cost)
+    """Generates a unit with D&D-style attributes."""
+    attributes = {
+        'str': random.randint(8, 15),
+        'dex': random.randint(8, 15),
+        'con': random.randint(8, 15),
+        'int': random.randint(8, 15),
+        'wis': random.randint(8, 15),
+        'cha': random.randint(8, 15),
+    }
+    return Unit(attributes=attributes)
 
 # --- PERSISTENCE ---
 SAVE_FILE = "game_data.json"
@@ -307,16 +333,22 @@ def upgrade_unit(unit_id):
             if unit_to_upgrade.xp >= xp_needed:
                 unit_to_upgrade.xp -= xp_needed
                 unit_to_upgrade.level += 1
-                # Apply two random stat boosts
-                stats_to_upgrade = ["max_hp", "attack", "initiative"]
+
+                # Apply a random +1 boost to two different base attributes
+                stats_to_upgrade = list(unit_to_upgrade.attributes.keys())
                 for stat in random.sample(stats_to_upgrade, 2):
-                    if stat == "max_hp":
-                        unit_to_upgrade.max_hp += 10
-                        unit_to_upgrade.hp = unit_to_upgrade.max_hp
-                    elif stat == "attack":
-                        unit_to_upgrade.attack += 2
-                    elif stat == "initiative":
-                        unit_to_upgrade.initiative += 1
+                    unit_to_upgrade.attributes[stat] += 1
+
+                # Re-initialize the unit to recalculate derived stats
+                # This is a bit of a hack, but it ensures consistency
+                upgraded_unit = Unit.from_dict(unit_to_upgrade.to_dict())
+
+                # Find the old unit in barracks and replace it
+                for i, u in enumerate(player.barracks):
+                    if u.id == upgraded_unit.id:
+                        player.barracks[i] = upgraded_unit
+                        break
+
                 save_data(player)
     return redirect(url_for('barracks'))
 
