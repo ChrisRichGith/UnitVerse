@@ -4,10 +4,18 @@
     <meta charset="UTF-8">
     <title>UnitVerse - Neuanfang</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; text-align: center; height: 100vh; margin: 0; }
-        .title-screen { padding: 2em; border: 1px solid #ccc; border-radius: 10px; }
+        body { font-family: sans-serif; text-align: center; margin: 0; padding: 1em; }
+        .title-screen { padding: 2em; border: 1px solid #ccc; border-radius: 10px; display: inline-block; }
         button { font-size: 1.2em; padding: 0.5em 1em; margin: 0.5em; cursor: pointer; }
         button:disabled { cursor: not-allowed; opacity: 0.5; }
+        .prep-container { display: flex; width: 100%; justify-content: space-around; align-items: flex-start; }
+        .side-panel { width: 25%; }
+        .center-panels { display: flex; flex-direction: column; align-items: center; width: 45%; }
+        .team-panel { width: 100%; margin-bottom: 2em; }
+        .board { display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); gap: 5px; border: 1px solid black; padding: 10px; min-height: 200px; }
+        .unit-card { border: 1px solid #999; padding: 10px; margin-bottom: 10px; background: #f9f9f9; }
+        #opponent-board { transform: rotate(180deg); }
+        #opponent-board .slot { transform: rotate(180deg); }
     </style>
 </head>
 <body>
@@ -23,12 +31,12 @@
         <a href="{{ url_for('barracks') }}"><button>Kaserne</button></a>
     </div>
     {% elif game.game_state == 'preparation' %}
-    <div class="prep-container" style="display: flex; width: 100%; justify-content: space-around; align-items: flex-start;">
-        <div class="barracks-panel" style="width: 25%;">
+    <div class="prep-container">
+        <div class="side-panel">
             <h3>Kaserne</h3>
             {% if game.player1.barracks %}
                 {% for unit in game.player1.barracks %}
-                    <div class="unit-card" style="border: 1px solid #999; padding: 10px; margin-bottom: 10px; background: #f9f9f9;">
+                    <div class="unit-card">
                         <strong>{{ unit.name }} (Lvl {{ unit.level }})</strong><br>
                         HP:{{ unit.max_hp }}, Atk:{{ unit.attack }}<br>
                         <form action="/deploy_unit/{{ unit.id }}" method="post">
@@ -40,27 +48,38 @@
                 <p>Leer</p>
             {% endif %}
         </div>
-        <div class="team-panel" style="width: 40%;">
-            <h2>Team-Zusammenstellung</h2>
-            <p>Gold: {{ game.player1.gold }}</p>
-            <div class="board" style="display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); gap: 5px; border: 1px solid black; padding: 10px; min-height: 200px;">
-                {% for r in range(3) %}{% for c in range(2) %}
-                    <div class="slot" style="border: 1px solid #eee; padding: 5px;">
-                    {% set unit = game.player1.board.get((r,c)) %}
-                    {% if unit %}
-                        <strong>{{ unit.name }}</strong><br>
-                        <small>HP: {{ unit.hp }}</small>
-                    {% else %}
-                        (Leer)
-                    {% endif %}
-                    </div>
-                {% endfor %}{% endfor %}
+
+        <div class="center-panels">
+            <div class="team-panel">
+                <h2>Gegner</h2>
+                <div class="board" id="opponent-board">
+                    {# AI board is empty until combat starts, but this sets up the layout #}
+                    {% for r in range(3) %}{% for c in range(2) %}<div class="slot">(Leer)</div>{% endfor %}{% endfor %}
+                </div>
             </div>
-            <form action="/start_combat" method="post" style="margin-top: 1em;">
-                <button type="submit">Kauf beenden & Kampf starten</button>
-            </form>
+            <div class="team-panel">
+                <h2>Dein Team</h2>
+                <p>Gold: {{ game.player1.gold }}</p>
+                <div class="board">
+                    {% for r in range(3) %}{% for c in range(2) %}
+                        <div class="slot">
+                        {% set unit = game.player1.board.get((r,c)) %}
+                        {% if unit %}
+                            <strong>{{ unit.name }}</strong><br>
+                            <small>HP: {{ unit.hp }}</small>
+                        {% else %}
+                            (Leer)
+                        {% endif %}
+                        </div>
+                    {% endfor %}{% endfor %}
+                </div>
+                <form action="/start_combat" method="post" style="margin-top: 1em;">
+                    <button type="submit">Kauf beenden & Kampf starten</button>
+                </form>
+            </div>
         </div>
-        <div class="shop-panel" style="width: 45%;">
+
+        <div class="side-panel">
             <h3>Shop</h3>
             {% for unit in game.shop_units %}
             <div class="unit-card" style="border: 1px solid #999; padding: 10px; margin-bottom: 10px; background: #f9f9f9;">

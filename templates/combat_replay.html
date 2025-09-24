@@ -4,22 +4,24 @@
     <meta charset="UTF-8">
     <title>Kampf-Wiedergabe</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; text-align: center; }
-        .game-container { display: flex; align-items: flex-start; justify-content: space-around; width: 100%; }
-        .player-area { width: 40%; }
+        body { font-family: sans-serif; }
+        .game-container { display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .player-area { width: 60%; margin: 1em 0; }
         .board { display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); gap: 5px; border: 1px solid black; padding: 10px; min-height: 200px; }
         .unit-slot { border: 1px solid #eee; padding: 5px; min-height: 80px; transition: background-color 0.2s; }
         .unit-slot.defeated { background-color: #e0e0e0; text-decoration: line-through; opacity: 0.6; }
-        .log-area { width: 15%; height: 400px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; text-align: left;}
+        .log-area { width: 40%; height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; text-align: left; margin: 1em 0;}
         .attacking { background-color: #d4edda !important; }
         .attacked { background-color: #f8d7da !important; }
+        #opponent-board { transform: rotate(180deg); }
+        #opponent-board .unit-slot { transform: rotate(180deg); } /* Rotate content back */
     </style>
 </head>
 <body>
     <div class="game-container">
-        <div class="player-area">
+        <div class="player-area" id="player1-area">
             <h2>{{ game.player1.name }}</h2>
-            <div class="board">
+            <div class="board" id="player1-board">
                 {% for r in range(3) %}{% for c in range(2) %}
                     {% set unit = game.player1.board.get((r,c)) %}
                     <div class="unit-slot" id="{{ unit.id if unit else '' }}">
@@ -36,9 +38,9 @@
             <h3>Kampf Log</h3>
         </div>
 
-        <div class="player-area">
+        <div class="player-area" id="player2-area">
             <h2>{{ game.player2.name }}</h2>
-            <div class="board">
+            <div class="board" id="opponent-board">
                 {% for r in range(3) %}{% for c in range(2) %}
                     {% set unit = game.player2.board.get((r,c)) %}
                     <div class="unit-slot" id="{{ unit.id if unit else '' }}">
