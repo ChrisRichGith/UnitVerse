@@ -76,50 +76,57 @@
     </div>
 
     <script>
-        const combatLog = JSON.parse('{{ combat_log_json|safe }}');
-        const logDisplay = document.getElementById('combat-log-display');
-        let currentStep = 0;
+        const showAnimation = {{ show_animation|tojson }};
 
-        function processNextStep() {
-            if (currentStep >= combatLog.length) {
-                document.getElementById('results-area').style.display = 'block';
-                return;
-            }
+        if (showAnimation) {
+            const combatLog = JSON.parse('{{ combat_log_json|safe }}');
+            const logDisplay = document.getElementById('combat-log-display');
+            let currentStep = 0;
 
-            const step = combatLog[currentStep];
-            const p = document.createElement('p');
+            function processNextStep() {
+                if (currentStep >= combatLog.length) {
+                    document.getElementById('results-area').style.display = 'block';
+                    return;
+                }
 
-            // Reset highlights
-            document.querySelectorAll('.attacking, .attacked').forEach(el => {
-                el.classList.remove('attacking', 'attacked');
-            });
+                const step = combatLog[currentStep];
+                const p = document.createElement('p');
 
-            if (step.type === 'round') {
-                p.innerHTML = `<strong>--- Runde ${step.number} ---</strong>`;
-            } else if (step.type === 'attack') {
-                p.textContent = `${step.attacker_name} greift ${step.target_name} für ${step.damage} Schaden an.`;
-                const attackerSlot = document.getElementById(step.attacker_id);
-                const targetSlot = document.getElementById(step.target_id);
+                // Reset highlights
+                document.querySelectorAll('.attacking, .attacked').forEach(el => {
+                    el.classList.remove('attacking', 'attacked');
+                });
 
-                if (attackerSlot) attackerSlot.classList.add('attacking');
-                if (targetSlot) {
-                    targetSlot.classList.add('attacked');
-                    const hpSpan = targetSlot.querySelector('.hp-val');
-                    if (hpSpan) hpSpan.textContent = step.target_hp_after;
-                    if (step.defeated) {
-                        targetSlot.classList.add('defeated');
+                if (step.type === 'round') {
+                    p.innerHTML = `<strong>--- Runde ${step.number} ---</strong>`;
+                } else if (step.type === 'attack') {
+                    p.textContent = `${step.attacker_name} greift ${step.target_name} für ${step.damage} Schaden an.`;
+                    const attackerSlot = document.getElementById(step.attacker_id);
+                    const targetSlot = document.getElementById(step.target_id);
+
+                    if (attackerSlot) attackerSlot.classList.add('attacking');
+                    if (targetSlot) {
+                        targetSlot.classList.add('attacked');
+                        const hpSpan = targetSlot.querySelector('.hp-val');
+                        if (hpSpan) hpSpan.textContent = step.target_hp_after;
+                        if (step.defeated) {
+                            targetSlot.classList.add('defeated');
+                        }
                     }
                 }
+
+                logDisplay.appendChild(p);
+                logDisplay.scrollTop = logDisplay.scrollHeight; // Auto-scroll
+                currentStep++;
+                setTimeout(processNextStep, 700); // 0.7 second delay between steps
             }
 
-            logDisplay.appendChild(p);
-            logDisplay.scrollTop = logDisplay.scrollHeight; // Auto-scroll
-            currentStep++;
-            setTimeout(processNextStep, 700); // 0.7 second delay between steps
+            // Start the combat animation
+            setTimeout(processNextStep, 1000);
+        } else {
+            // If not showing animation, just display the results area immediately.
+            document.getElementById('results-area').style.display = 'block';
         }
-
-        // Start the combat animation
-        setTimeout(processNextStep, 1000);
     </script>
 </body>
 </html>

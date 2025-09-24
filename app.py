@@ -254,7 +254,7 @@ def start_combat():
 
     game.run_full_combat()
 
-    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]))
+    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]), show_animation=True)
 
 @app.route('/load_game', methods=['POST'])
 def load_game():
@@ -286,7 +286,7 @@ def move_to_barracks(unit_id):
             game.survivors.remove(survivor) # Remove from the list of choices
             save_data(game.player1) # Save the player's state
 
-    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]))
+    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]), show_animation=False)
 
 @app.route('/barracks')
 def barracks():
