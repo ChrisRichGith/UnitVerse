@@ -19,11 +19,11 @@
 </head>
 <body>
     <div class="game-container">
-        <div class="player-area" id="player1-area">
-            <h2>{{ game.player1.name }}</h2>
-            <div class="board" id="player1-board">
+        <div class="player-area" id="player2-area">
+            <h2>{{ game.player2.name }}</h2>
+            <div class="board" id="opponent-board">
                 {% for r in range(3) %}{% for c in range(2) %}
-                    {% set unit = game.player1.board.get((r,c)) %}
+                    {% set unit = game.player2.board.get((r,c)) %}
                     <div class="unit-slot" id="{{ unit.id if unit else '' }}">
                         {% if unit %}
                             <strong>{{ unit.name }}</strong><br>
@@ -38,11 +38,11 @@
             <h3>Kampf Log</h3>
         </div>
 
-        <div class="player-area" id="player2-area">
-            <h2>{{ game.player2.name }}</h2>
-            <div class="board" id="opponent-board">
+        <div class="player-area" id="player1-area">
+            <h2>{{ game.player1.name }}</h2>
+            <div class="board" id="player1-board">
                 {% for r in range(3) %}{% for c in range(2) %}
-                    {% set unit = game.player2.board.get((r,c)) %}
+                    {% set unit = game.player1.board.get((r,c)) %}
                     <div class="unit-slot" id="{{ unit.id if unit else '' }}">
                         {% if unit %}
                             <strong>{{ unit.name }}</strong><br>
