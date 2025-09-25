@@ -104,22 +104,27 @@
                 if (step.type === 'round') {
                     p.innerHTML = `<strong>--- Runde ${step.number} ---</strong>`;
                 } else if (step.type === 'attack') {
-                    p.textContent = `${step.attacker_name} greift ${step.target_name} für ${step.damage} Schaden an.`;
                     const attackerSlot = document.getElementById(step.attacker_id);
                     const targetSlot = document.getElementById(step.target_id);
+
+                    if (step.is_splash) {
+                        p.textContent = `${step.target_name} erleidet ${step.damage} Flächenschaden.`;
+                    } else {
+                        p.textContent = `${step.attacker_name} greift ${step.target_name} für ${step.damage} Schaden an.`;
+                    }
 
                     if (attackerSlot) attackerSlot.classList.add('attacking');
                     if (targetSlot) {
                         targetSlot.classList.add('attacked');
                         const hpSpan = targetSlot.querySelector('.hp-val');
-                    const shieldSpan = targetSlot.querySelector('.shield-display');
+                        const shieldSpan = targetSlot.querySelector('.shield-display');
                         if (hpSpan) hpSpan.textContent = step.target_hp_after;
-                    if (shieldSpan) shieldSpan.textContent = step.target_shield_after > 0 ? `+${step.target_shield_after} Schild` : '';
+                        if (shieldSpan) shieldSpan.textContent = step.target_shield_after > 0 ? `+${step.target_shield_after} Schild` : '';
                         if (step.defeated) {
                             targetSlot.classList.add('defeated');
                         }
                     }
-            } else if (step.type === 'heal') {
+                } else if (step.type === 'heal') {
                 p.textContent = `${step.healer_name} heilt ${step.target_name} für ${step.heal_amount} HP.`;
                 const healerSlot = document.getElementById(step.healer_id);
                 const targetSlot = document.getElementById(step.target_id);

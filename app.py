@@ -123,32 +123,27 @@ class Game:
                         'type': 'shield', 'actor_id': attacker.id, 'actor_name': attacker.class_name,
                         'shield_amount': shield_amount, 'shield_total': attacker.shield
                     })
+                elif attacker.class_name == 'Magier':
+                    # AREA OF EFFECT (AOE) ATTACK LOGIC
+                    opponent_player = self.player2 if attacker in self.player1.units else self.player1
+                    main_target = next((u for u in opponent_player.units if not u.is_defeated), None)
+
+                    if main_target:
+                        # Deal full damage to the main target
+                        self._apply_damage(attacker, main_target, attacker.attack)
+
+                        # Find and apply splash damage to adjacent targets
+                        splash_targets = self._get_adjacent_units(main_target, opponent_player)
+                        for splash_target in splash_targets:
+                            if splash_target != main_target and not splash_target.is_defeated:
+                                splash_damage = int(attacker.attack * 0.5)
+                                self._apply_damage(attacker, splash_target, splash_damage, is_splash=True)
                 else:
-                    # ATTACK LOGIC
+                    # STANDARD ATTACK LOGIC
                     opponent_player = self.player2 if attacker in self.player1.units else self.player1
                     target = next((u for u in opponent_player.units if not u.is_defeated), None)
-
                     if target:
-                        damage = attacker.attack
-
-                        # Apply damage to shield first
-                        damage_to_shield = min(target.shield, damage)
-                        target.shield -= damage_to_shield
-                        remaining_damage = damage - damage_to_shield
-
-                        # Apply remaining damage to HP
-                        original_hp = target.hp
-                        target.hp = max(0, target.hp - remaining_damage)
-
-                        log_entry = {
-                            'type': 'attack', 'attacker_id': attacker.id, 'attacker_name': attacker.class_name,
-                            'target_id': target.id, 'target_name': target.class_name, 'damage': damage,
-                            'target_hp_after': target.hp, 'target_shield_after': target.shield
-                        }
-                        if target.hp == 0:
-                            target.is_defeated = True
-                            log_entry['defeated'] = True
-                        self.combat_log.append(log_entry)
+                        self._apply_damage(attacker, target, attacker.attack)
 
                 if self.check_game_over():
                     break
@@ -158,6 +153,42 @@ class Game:
 
         self.determine_winner()
         self.game_state = "finished"
+
+    def _apply_damage(self, attacker, target, damage, is_splash=False):
+        # Apply damage to shield first
+        damage_to_shield = min(target.shield, damage)
+        target.shield -= damage_to_shield
+        remaining_damage = damage - damage_to_shield
+
+        # Apply remaining damage to HP
+        target.hp = max(0, target.hp - remaining_damage)
+
+        log_entry = {
+            'type': 'attack', 'attacker_id': attacker.id, 'attacker_name': attacker.class_name,
+            'target_id': target.id, 'target_name': target.class_name, 'damage': damage,
+            'target_hp_after': target.hp, 'target_shield_after': target.shield, 'is_splash': is_splash
+        }
+        if target.hp == 0:
+            target.is_defeated = True
+            log_entry['defeated'] = True
+        self.combat_log.append(log_entry)
+
+    def _get_adjacent_units(self, target_unit, opponent_player):
+        if not target_unit.position:
+            return []
+
+        r, c = target_unit.position
+        adjacent_positions = [
+            (r - 1, c), (r + 1, c),
+            (r, c - 1), (r, c + 1)
+        ]
+
+        adjacent_units = []
+        for pos in adjacent_positions:
+            unit = opponent_player.board.get(pos)
+            if unit:
+                adjacent_units.append(unit)
+        return adjacent_units
 
     def check_game_over(self):
         p1_alive = any(not u.is_defeated for u in self.player1.units)
@@ -314,6 +345,7 @@ def start_combat():
                 slot = next((pos for pos, unit in ai_player.board.items() if unit is None), None)
                 if slot:
                     ai_player.gold -= new_unit.cost
+                    new_unit.position = slot # Set the unit's position attribute
                     ai_player.units.append(new_unit)
                     ai_player.board[slot] = new_unit
                 else:
