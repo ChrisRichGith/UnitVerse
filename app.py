@@ -144,7 +144,7 @@ class Game:
                         self._apply_damage(attacker, main_target, attacker.attack)
                         splash_targets = self._get_adjacent_units(main_target, opponent_player)
                         for splash_target in splash_targets:
-                            if splash_target != main_target and not splash_target.is_defeated:
+                            if splash_target != main_target and not splash_target.is_defeated and not splash_target.is_hidden:
                                 splash_damage = int(attacker.attack * 0.5)
                                 self._apply_damage(attacker, splash_target, splash_damage, is_splash=True)
 
@@ -311,8 +311,11 @@ game = Game()
 @app.route('/')
 def index():
     global game
+    # If a game has just finished, reset the global game object to show the title screen
     if game.game_state == "finished":
         game = Game()
+
+    # Logic to check if save file exists for enabling/disabling "Spiel laden"
     save_exists = os.path.exists("game_data.json")
     return render_template('index.html', game=game, save_exists=save_exists)
 
