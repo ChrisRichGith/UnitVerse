@@ -16,6 +16,7 @@
         .healing { background-color: #cce5ff !important; } /* Light blue for healing */
         .shielding { border: 2px solid #007bff; box-shadow: 0 0 5px #007bff; }
         .frenzy { border: 2px solid #dc3545; box-shadow: 0 0 5px #dc3545; }
+        .buffed { border: 2px solid #ffc107; box-shadow: 0 0 5px #ffc107; }
         #opponent-board { transform: rotate(180deg); }
         #opponent-board .unit-slot { transform: rotate(180deg); } /* Rotate content back */
     </style>
@@ -148,14 +149,30 @@
                 p.textContent = `${step.actor_name} verfällt in Raserei!`;
                 const actorSlot = document.getElementById(step.actor_id);
                 if (actorSlot) actorSlot.classList.add('frenzy');
+            } else if (step.type === 'battle_song') {
+                p.textContent = `${step.actor_name} spielt ein Kampflied! Alle Verbündeten sind gestärkt.`;
+                const actorSlot = document.getElementById(step.actor_id);
+                if (actorSlot) {
+                    actorSlot.classList.add('attacking');
+                    // Find all allies and apply buff
+                    const allies = actorSlot.closest('.player-area').querySelectorAll('.unit-slot');
+                    allies.forEach(allySlot => {
+                        if (allySlot.id && allySlot.id !== step.actor_id) {
+                            allySlot.classList.add('buffed');
+                        }
+                    });
+                }
             } else if (step.type === 'effect_end') {
-                p.textContent = `Raserei von ${step.unit_name} endet.`;
-                // We need to find the unit by name, which is not ideal but works for now
-                document.querySelectorAll('.unit-slot').forEach(slot => {
-                    if (slot.textContent.includes(step.unit_name)) {
-                        slot.classList.remove('frenzy');
+                p.textContent = `${step.effect.charAt(0).toUpperCase() + step.effect.slice(1)} von ${step.unit_name} endet.`;
+                const unitSlot = document.getElementById(step.unit_id);
+                if (unitSlot) {
+                    let cssClass = '';
+                    if (step.effect === 'frenzy') cssClass = 'frenzy';
+                    if (step.effect === 'battle_song') cssClass = 'buffed';
+                    if (cssClass) {
+                        unitSlot.classList.remove(cssClass);
                     }
-                });
+                }
             }
 
                 logDisplay.appendChild(p);

@@ -108,7 +108,7 @@ class Game:
                     effect['duration'] -= 1
                     if effect['duration'] <= 0:
                         unit.status_effects.remove(effect)
-                        self.combat_log.append({'type': 'effect_end', 'unit_name': unit.class_name, 'effect': effect['type']})
+                        self.combat_log.append({'type': 'effect_end', 'unit_id': unit.id, 'unit_name': unit.class_name, 'effect': effect['type']})
 
             for attacker in turn_order:
                 if attacker.is_defeated:
@@ -146,8 +146,20 @@ class Game:
                             if splash_target != main_target and not splash_target.is_defeated:
                                 splash_damage = int(attacker.attack * 0.5)
                                 self._apply_damage(attacker, splash_target, splash_damage, is_splash=True)
+
+                elif attacker.class_name == 'Barde':
+                    # BATTLE SONG LOGIC
+                    allied_player = self.player1 if attacker in self.player1.units else self.player2
+                    self.combat_log.append({
+                        'type': 'battle_song', 'actor_id': attacker.id, 'actor_name': attacker.class_name
+                    })
+                    for ally in allied_player.units:
+                        if not ally.is_defeated and ally.id != attacker.id:
+                            # Prevent stacking the same buff
+                            if not any(e['type'] == 'battle_song' for e in ally.status_effects):
+                                ally.status_effects.append({'type': 'battle_song', 'duration': 3})
                 else:
-                    # STANDARD ATTACK LOGIC (for Barbar, Schurke, Barde, Abenteurer)
+                    # STANDARD ATTACK LOGIC (for Barbar, Schurke, and Abenteurer)
                     if attacker.class_name == 'Barbar' and not attacker.frenzy_used:
                         attacker.status_effects.append({'type': 'frenzy', 'duration': 3})
                         attacker.frenzy_used = True
@@ -172,6 +184,8 @@ class Game:
     def _apply_damage(self, attacker, target, damage, is_splash=False):
         if any(e['type'] == 'frenzy' for e in attacker.status_effects):
             damage = int(damage * 1.5)
+        if any(e['type'] == 'battle_song' for e in attacker.status_effects):
+            damage = int(damage * 1.25)
 
         damage_to_shield = min(target.shield, damage)
         target.shield -= damage_to_shield
