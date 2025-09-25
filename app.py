@@ -42,6 +42,8 @@ class Unit:
         self.is_defeated = False
         self.position = None
         self.shield = 0
+        self.status_effects = [] # e.g. [{'type': 'frenzy', 'duration': 2}]
+        self.frenzy_used = False
 
     def to_dict(self):
         return {
@@ -89,11 +91,24 @@ class Game:
 
     def run_full_combat(self):
         """Simulates the entire combat from start to finish."""
+        # Reset frenzy state for all units at the start of combat
+        for unit in self.player1.units + self.player2.units:
+            unit.frenzy_used = False
+
         turn_order = sorted(self.player1.units + self.player2.units, key=lambda u: u.initiative, reverse=True)
 
         for i in range(20): # Max 20 rounds
             self.round_count = i + 1
             self.combat_log.append({'type': 'round', 'number': self.round_count})
+
+            # --- STATUS EFFECT DURATION HANDLING ---
+            for unit in turn_order:
+                if unit.is_defeated: continue
+                for effect in list(unit.status_effects):
+                    effect['duration'] -= 1
+                    if effect['duration'] <= 0:
+                        unit.status_effects.remove(effect)
+                        self.combat_log.append({'type': 'effect_end', 'unit_name': unit.class_name, 'effect': effect['type']})
 
             for attacker in turn_order:
                 if attacker.is_defeated:
@@ -101,7 +116,6 @@ class Game:
 
                 # --- ACTION LOGIC ---
                 if attacker.class_name == 'Kleriker':
-                    # HEAL LOGIC
                     allied_player = self.player1 if attacker in self.player1.units else self.player2
                     heal_candidates = [u for u in allied_player.units if not u.is_defeated and u.hp < u.max_hp]
                     if heal_candidates:
@@ -116,7 +130,6 @@ class Game:
                             'heal_amount': target.hp - original_hp, 'target_hp_after': target.hp
                         })
                 elif attacker.class_name == 'Krieger':
-                    # SHIELD LOGIC
                     shield_amount = 10 + attacker.attributes.get('str', 0)
                     attacker.shield += shield_amount
                     self.combat_log.append({
@@ -124,22 +137,24 @@ class Game:
                         'shield_amount': shield_amount, 'shield_total': attacker.shield
                     })
                 elif attacker.class_name == 'Magier':
-                    # AREA OF EFFECT (AOE) ATTACK LOGIC
                     opponent_player = self.player2 if attacker in self.player1.units else self.player1
                     main_target = next((u for u in opponent_player.units if not u.is_defeated), None)
-
                     if main_target:
-                        # Deal full damage to the main target
                         self._apply_damage(attacker, main_target, attacker.attack)
-
-                        # Find and apply splash damage to adjacent targets
                         splash_targets = self._get_adjacent_units(main_target, opponent_player)
                         for splash_target in splash_targets:
                             if splash_target != main_target and not splash_target.is_defeated:
                                 splash_damage = int(attacker.attack * 0.5)
                                 self._apply_damage(attacker, splash_target, splash_damage, is_splash=True)
                 else:
-                    # STANDARD ATTACK LOGIC
+                    # STANDARD ATTACK LOGIC (for Barbar, Schurke, Barde, Abenteurer)
+                    if attacker.class_name == 'Barbar' and not attacker.frenzy_used:
+                        attacker.status_effects.append({'type': 'frenzy', 'duration': 3})
+                        attacker.frenzy_used = True
+                        self.combat_log.append({
+                            'type': 'frenzy_start', 'actor_id': attacker.id, 'actor_name': attacker.class_name
+                        })
+
                     opponent_player = self.player2 if attacker in self.player1.units else self.player1
                     target = next((u for u in opponent_player.units if not u.is_defeated), None)
                     if target:
@@ -155,12 +170,13 @@ class Game:
         self.game_state = "finished"
 
     def _apply_damage(self, attacker, target, damage, is_splash=False):
-        # Apply damage to shield first
+        if any(e['type'] == 'frenzy' for e in attacker.status_effects):
+            damage = int(damage * 1.5)
+
         damage_to_shield = min(target.shield, damage)
         target.shield -= damage_to_shield
         remaining_damage = damage - damage_to_shield
 
-        # Apply remaining damage to HP
         target.hp = max(0, target.hp - remaining_damage)
 
         log_entry = {
@@ -179,8 +195,7 @@ class Game:
 
         r, c = target_unit.position
         adjacent_positions = [
-            (r - 1, c), (r + 1, c),
-            (r, c - 1), (r, c + 1)
+            (r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)
         ]
 
         adjacent_units = []
@@ -222,19 +237,16 @@ class Game:
         if self.winner == self.player1.name:
             for unit in self.player1.units:
                 if not unit.is_defeated:
-                    unit.xp += 50 # Award XP for surviving
+                    unit.xp += 50
                     self.survivors.append(unit)
 
 # --- UNIT GENERATION ---
 def generate_random_unit():
     """Generates a unit with D&D-style attributes."""
     attributes = {
-        'str': random.randint(8, 15),
-        'dex': random.randint(8, 15),
-        'con': random.randint(8, 15),
-        'int': random.randint(8, 15),
-        'wis': random.randint(8, 15),
-        'cha': random.randint(8, 15),
+        'str': random.randint(8, 15), 'dex': random.randint(8, 15),
+        'con': random.randint(8, 15), 'int': random.randint(8, 15),
+        'wis': random.randint(8, 15), 'cha': random.randint(8, 15),
     }
     return Unit(attributes=attributes)
 
@@ -252,9 +264,7 @@ def load_data():
         try:
             data = json.load(f)
             player = Player(name=data.get("name", "Spieler 1"))
-            # Create units from data, which might return None for incompatible old data
             loaded_units = [Unit.from_dict(u_data) for u_data in data.get("barracks", [])]
-            # Filter out any None values to keep the barracks clean
             player.barracks = [unit for unit in loaded_units if unit is not None]
             return player
         except (json.JSONDecodeError, KeyError):
@@ -262,30 +272,23 @@ def load_data():
 
 # --- FLASK APP ---
 app = Flask(__name__)
-# For now, we start a new game object each time. Persistence will be added later.
 game = Game()
 
 @app.route('/')
 def index():
     global game
-    # If a game has just finished, reset the global game object to show the title screen
     if game.game_state == "finished":
         game = Game()
-
-    # Logic to check if save file exists for enabling/disabling "Spiel laden"
     save_exists = os.path.exists("game_data.json")
     return render_template('index.html', game=game, save_exists=save_exists)
 
 @app.route('/start_game', methods=['POST'])
 def start_game():
     global game
-    # When starting a new game, we create a fresh game object,
-    # but we immediately load the player's barracks data if it exists.
     game = Game()
     player_data = load_data()
     if player_data:
         game.player1 = player_data
-
     game.game_state = "preparation"
     game.shop_units = [generate_random_unit() for _ in range(4)]
     return redirect(url_for('index'))
@@ -294,10 +297,8 @@ def start_game():
 def buy_unit(unit_id):
     if game.game_state != "preparation":
         return redirect(url_for('index'))
-
     unit_to_buy = next((u for u in game.shop_units if u.id == unit_id), None)
     player = game.player1
-
     if unit_to_buy and player.gold >= unit_to_buy.cost:
         slot = next((pos for pos, unit in player.board.items() if unit is None), None)
         if slot:
@@ -305,55 +306,43 @@ def buy_unit(unit_id):
             player.units.append(unit_to_buy)
             player.board[slot] = unit_to_buy
             game.shop_units.remove(unit_to_buy)
-            # The shop does not replenish in this new design until the next phase.
-
     return redirect(url_for('index'))
 
 @app.route('/deploy_unit/<unit_id>', methods=['POST'])
 def deploy_unit(unit_id):
     if game.game_state != "preparation":
         return redirect(url_for('index'))
-
     player = game.player1
     unit_to_deploy = next((u for u in player.barracks if u.id == unit_id), None)
-
-    # Prevent deploying the same unit twice
     is_already_deployed = any(u.id == unit_id for u in player.units)
-
     if unit_to_deploy and not is_already_deployed:
         slot = next((pos for pos, unit in player.board.items() if unit is None), None)
         if slot:
-            # Deploy a copy, keeping the original in the barracks
             deployed_unit = Unit.from_dict(unit_to_deploy.to_dict())
             player.units.append(deployed_unit)
             player.board[slot] = deployed_unit
-
     return redirect(url_for('index'))
 
 @app.route('/start_combat', methods=['POST'])
 def start_combat():
     if game.game_state != "preparation":
         return redirect(url_for('index'))
-
-    # AI buys up to 4 units with its gold
     ai_player = game.player2
     if not ai_player.units:
         attempts = 0
-        while len(ai_player.units) < 4 and attempts < 20: # Limit attempts to prevent infinite loops
+        while len(ai_player.units) < 4 and attempts < 20:
             new_unit = generate_random_unit()
             if ai_player.gold >= new_unit.cost:
                 slot = next((pos for pos, unit in ai_player.board.items() if unit is None), None)
                 if slot:
                     ai_player.gold -= new_unit.cost
-                    new_unit.position = slot # Set the unit's position attribute
+                    new_unit.position = slot
                     ai_player.units.append(new_unit)
                     ai_player.board[slot] = new_unit
                 else:
-                    break # AI board is full
+                    break
             attempts += 1
-
     game.run_full_combat()
-
     return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]), show_animation=True)
 
 @app.route('/load_game', methods=['POST'])
@@ -361,45 +350,34 @@ def load_game():
     global game
     loaded_player = load_data()
     if loaded_player:
-        game = Game() # Start a fresh game environment
-        game.player1 = loaded_player # Overwrite the default player with the loaded one
+        game = Game()
+        game.player1 = loaded_player
     return redirect(url_for('index'))
 
 @app.route('/move_to_barracks/<unit_id>', methods=['POST'])
 def move_to_barracks(unit_id):
     if game.game_state != "finished":
         return redirect(url_for('index'))
-
     survivor = next((u for u in game.survivors if u.id == unit_id), None)
-    player = game.player1
-
-    if survivor and len(player.barracks) < 3:
-        # Check if a unit with the same ID is already in the barracks
-        if not any(u.id == survivor.id for u in player.barracks):
-            # Add a clean copy to the barracks
+    if survivor and len(game.player1.barracks) < 3:
+        if not any(u.id == survivor.id for u in game.player1.barracks):
             barracks_copy = Unit.from_dict(survivor.to_dict())
-            barracks_copy.hp = barracks_copy.max_hp # Heal the unit
-
-            # Since the survivor is a temporary object from a finished game,
-            # we need to update the main player object's barracks
+            barracks_copy.hp = barracks_copy.max_hp
             game.player1.barracks.append(barracks_copy)
-            game.survivors.remove(survivor) # Remove from the list of choices
-            save_data(game.player1) # Save the player's state
-
+            game.survivors.remove(survivor)
+            save_data(game.player1)
     return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]), show_animation=False)
 
 @app.route('/barracks')
 def barracks():
-    # When visiting the barracks, we should always have the latest data from the save file.
-    # The 'game' object might be stale if a new game was started.
     player_data = load_data()
     if not player_data:
-        player_data = game.player1 # Fallback to the current game's player
+        player_data = game.player1
     return render_template('barracks.html', player=player_data)
 
 @app.route('/upgrade_unit/<unit_id>', methods=['POST'])
 def upgrade_unit(unit_id):
-    player = load_data() # Always load fresh data before modifying
+    player = load_data()
     if player:
         unit_to_upgrade = next((u for u in player.barracks if u.id == unit_id), None)
         if unit_to_upgrade:
@@ -407,22 +385,14 @@ def upgrade_unit(unit_id):
             if unit_to_upgrade.xp >= xp_needed:
                 unit_to_upgrade.xp -= xp_needed
                 unit_to_upgrade.level += 1
-
-                # Apply a random +1 boost to two different base attributes
                 stats_to_upgrade = list(unit_to_upgrade.attributes.keys())
                 for stat in random.sample(stats_to_upgrade, 2):
                     unit_to_upgrade.attributes[stat] += 1
-
-                # Re-initialize the unit to recalculate derived stats
-                # This is a bit of a hack, but it ensures consistency
                 upgraded_unit = Unit.from_dict(unit_to_upgrade.to_dict())
-
-                # Find the old unit in barracks and replace it
                 for i, u in enumerate(player.barracks):
                     if u.id == upgraded_unit.id:
                         player.barracks[i] = upgraded_unit
                         break
-
                 save_data(player)
     return redirect(url_for('barracks'))
 

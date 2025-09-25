@@ -15,6 +15,7 @@
         .attacked { background-color: #f8d7da !important; }
         .healing { background-color: #cce5ff !important; } /* Light blue for healing */
         .shielding { border: 2px solid #007bff; box-shadow: 0 0 5px #007bff; }
+        .frenzy { border: 2px solid #dc3545; box-shadow: 0 0 5px #dc3545; }
         #opponent-board { transform: rotate(180deg); }
         #opponent-board .unit-slot { transform: rotate(180deg); } /* Rotate content back */
     </style>
@@ -143,6 +144,18 @@
                     const shieldSpan = actorSlot.querySelector('.shield-display');
                     if (shieldSpan) shieldSpan.textContent = `+${step.shield_total} Schild`;
                 }
+            } else if (step.type === 'frenzy_start') {
+                p.textContent = `${step.actor_name} verfällt in Raserei!`;
+                const actorSlot = document.getElementById(step.actor_id);
+                if (actorSlot) actorSlot.classList.add('frenzy');
+            } else if (step.type === 'effect_end') {
+                p.textContent = `Raserei von ${step.unit_name} endet.`;
+                // We need to find the unit by name, which is not ideal but works for now
+                document.querySelectorAll('.unit-slot').forEach(slot => {
+                    if (slot.textContent.includes(step.unit_name)) {
+                        slot.classList.remove('frenzy');
+                    }
+                });
             }
 
                 logDisplay.appendChild(p);
