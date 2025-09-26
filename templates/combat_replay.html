@@ -175,8 +175,14 @@
                     const attackerRect = attacker.getBoundingClientRect();
                     const targetRect = target.getBoundingClientRect();
 
-                    const dx = targetRect.left - attackerRect.left + (targetRect.width - attackerRect.width) / 2;
-                    const dy = targetRect.top - attackerRect.top + (targetRect.height - attackerRect.height) / 2;
+                    let dx = targetRect.left - attackerRect.left + (targetRect.width - attackerRect.width) / 2;
+                    let dy = targetRect.top - attackerRect.top + (targetRect.height - attackerRect.height) / 2;
+
+                    // If attacker is on the rotated opponent board, invert the translation
+                    if (attacker.closest('#opponent-board')) {
+                        dx = -dx;
+                        dy = -dy;
+                    }
 
                     attacker.style.zIndex = 100;
                     attacker.style.transition = 'transform 0.25s ease-out';
