@@ -4,16 +4,84 @@
     <meta charset="UTF-8">
     <title>UnitVerse - Neuanfang</title>
     <style>
-        body { font-family: sans-serif; text-align: center; margin: 0; padding: 1em; }
-        .title-screen { padding: 2em; border: 1px solid #ccc; border-radius: 10px; display: inline-block; }
-        button { font-size: 1.2em; padding: 0.5em 1em; margin: 0.5em; cursor: pointer; }
-        button:disabled { cursor: not-allowed; opacity: 0.5; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 1em;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .title-screen {
+            padding: 2em;
+            border: 1px solid #444;
+            border-radius: 10px;
+            display: inline-block;
+            background-color: #2a2a2a;
+        }
+        button {
+            font-size: 1.2em;
+            padding: 0.5em 1em;
+            margin: 0.5em;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
         .prep-container { display: flex; width: 100%; justify-content: space-around; align-items: flex-start; }
-        .side-panel { width: 25%; }
+        .side-panel { width: 25%; background-color: #252525; padding: 1em; border-radius: 8px; }
         .center-panels { display: flex; flex-direction: column; align-items: center; width: 45%; }
         .team-panel { width: 100%; margin-bottom: 2em; }
-        .board { display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); gap: 5px; border: 1px solid black; padding: 10px; min-height: 200px; }
-        .unit-card { border: 1px solid #999; padding: 10px; margin-bottom: 10px; background: #f9f9f9; }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 10px;
+            border: 2px solid #777;
+            background-color: #2d2d2d;
+            background-image: linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%);
+            background-size: 20px 20px;
+            padding: 10px;
+            min-height: 240px;
+            border-radius: 10px;
+            box-shadow: inset 0 0 15px #000;
+        }
+        .unit-card {
+            border: 1px solid #666;
+            padding: 0.8em;
+            margin-bottom: 1em;
+            background: linear-gradient(145deg, #444, #3a3a3a);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.6);
+            text-align: left;
+            font-size: 0.9em;
+        }
+        .unit-card strong {
+            font-size: 1.1em;
+            color: #00aaff;
+        }
+        .unit-card .class-icon {
+            font-size: 1.2em;
+            margin-right: 0.3em;
+        }
+        .slot {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid #666;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+            padding: 8px;
+            min-height: 80px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #888;
+        }
+        .slot strong { color: #00aaff; font-size: 1.1em; }
         #opponent-board { transform: rotate(180deg); }
         #opponent-board .slot { transform: rotate(180deg); }
     </style>
@@ -37,7 +105,7 @@
             {% if game.player1.barracks %}
                 {% for unit in game.player1.barracks %}
                     <div class="unit-card">
-                        <strong>{{ unit.class_name }} (Lvl {{ unit.level }})</strong><br>
+                        <strong>{{ class_icons[unit.class_name] }} {{ unit.class_name }} (Lvl {{ unit.level }})</strong><br>
                         HP:{{ unit.max_hp }}, Atk:{{ unit.attack }}<br>
                         <form action="/deploy_unit/{{ unit.id }}" method="post">
                             <button type="submit">Einsetzen</button>
@@ -65,7 +133,7 @@
                         <div class="slot">
                         {% set unit = game.player1.board.get((r,c)) %}
                         {% if unit %}
-                            <strong>{{ unit.class_name }}</strong><br>
+                            <strong>{{ class_icons[unit.class_name] }} {{ unit.class_name }}</strong><br>
                             <small>HP: {{ unit.hp }}</small>
                         {% else %}
                             (Leer)
@@ -83,7 +151,7 @@
             <h3>Shop</h3>
             {% for unit in game.shop_units %}
             <div class="unit-card">
-                <strong>{{ unit.class_name }}</strong><br>
+                <strong>{{ class_icons[unit.class_name] }} {{ unit.class_name }}</strong><br>
                 HP:{{ unit.max_hp }}, Atk:{{ unit.attack }}, Init:{{ unit.initiative }}<br>
                 Kosten: {{ unit.cost }} Gold<br>
                 <form action="/buy_unit/{{ unit.id }}" method="post">

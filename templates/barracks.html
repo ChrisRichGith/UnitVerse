@@ -4,13 +4,49 @@
     <meta charset="UTF-8">
     <title>Kaserne</title>
     <style>
-        body { font-family: sans-serif; padding: 2em; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 2em;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
         h1, h2 { text-align: center; }
         .barracks-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 1em; }
-        .unit-card { border: 1px solid #999; padding: 1em; width: 200px; background: #f9f9f9; }
-        button { font-size: 1em; padding: 0.5em; cursor: pointer; margin-top: 0.5em;}
-        button:disabled { cursor: not-allowed; opacity: 0.5; }
-        .nav-link { display: block; text-align: center; margin-top: 2em; }
+        .unit-card {
+            border: 1px solid #666;
+            padding: 0.8em;
+            margin-bottom: 1em;
+            background: linear-gradient(145deg, #444, #3a3a3a);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.6);
+            text-align: left;
+            font-size: 0.9em;
+            width: 220px;
+        }
+        .unit-card strong {
+            font-size: 1.1em;
+            color: #00aaff;
+        }
+        .unit-card small {
+            color: #ccc;
+            line-height: 1.4;
+        }
+        button {
+            font-size: 1em;
+            padding: 0.5em;
+            cursor: pointer;
+            margin-top: 0.5em;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .nav-link { display: block; text-align: center; margin-top: 2em; color: #00aaff; }
     </style>
 </head>
 <body>
@@ -19,7 +55,7 @@
         <div class="barracks-container">
         {% for unit in player.barracks %}
             <div class="unit-card">
-                <strong>{{ unit.class_name }} (Lvl {{ unit.level }})</strong><br>
+                <strong>{{ class_icons[unit.class_name] }} {{ unit.class_name }} (Lvl {{ unit.level }})</strong><br>
                 HP: {{ unit.max_hp }} | Atk: {{ unit.attack }} | Init: {{ unit.initiative }}<br>
                 <small>
                 STR:{{ unit.attributes.str }} DEX:{{ unit.attributes.dex }} CON:{{ unit.attributes.con }}<br>

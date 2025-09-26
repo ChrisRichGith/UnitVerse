@@ -308,16 +308,19 @@ def load_data():
 app = Flask(__name__)
 game = Game()
 
+CLASS_ICONS = {
+    'Krieger': '⚔️', 'Schurke': '🏹', 'Barbar': '🪓',
+    'Magier': '🔮', 'Kleriker': '✨', 'Barde': '🎵',
+    'Abenteurer': '🧑‍'
+}
+
 @app.route('/')
 def index():
     global game
-    # If a game has just finished, reset the global game object to show the title screen
     if game.game_state == "finished":
         game = Game()
-
-    # Logic to check if save file exists for enabling/disabling "Spiel laden"
     save_exists = os.path.exists("game_data.json")
-    return render_template('index.html', game=game, save_exists=save_exists)
+    return render_template('index.html', game=game, save_exists=save_exists, class_icons=CLASS_ICONS)
 
 @app.route('/start_game', methods=['POST'])
 def start_game():
@@ -380,7 +383,7 @@ def start_combat():
                     break
             attempts += 1
     game.run_full_combat()
-    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]), show_animation=True)
+    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]), show_animation=True, class_icons=CLASS_ICONS)
 
 @app.route('/load_game', methods=['POST'])
 def load_game():
@@ -403,14 +406,14 @@ def move_to_barracks(unit_id):
             game.player1.barracks.append(barracks_copy)
             game.survivors.remove(survivor)
             save_data(game.player1)
-    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]), show_animation=False)
+    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]), show_animation=False, class_icons=CLASS_ICONS)
 
 @app.route('/barracks')
 def barracks():
     player_data = load_data()
     if not player_data:
         player_data = game.player1
-    return render_template('barracks.html', player=player_data)
+    return render_template('barracks.html', player=player_data, class_icons=CLASS_ICONS)
 
 @app.route('/upgrade_unit/<unit_id>', methods=['POST'])
 def upgrade_unit(unit_id):
