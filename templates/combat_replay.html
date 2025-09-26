@@ -186,7 +186,13 @@
 
                     attacker.style.zIndex = 100;
                     attacker.style.transition = 'transform 0.25s ease-out';
-                    attacker.style.transform = `translate(${dx}px, ${dy}px)`;
+
+                    const isOpponent = attacker.closest('#opponent-board');
+                    let moveTransform = `translate(${dx}px, ${dy}px)`;
+                    if (isOpponent) {
+                        moveTransform += ' rotate(180deg)';
+                    }
+                    attacker.style.transform = moveTransform;
 
                     const onHit = () => {
                         attacker.removeEventListener('transitionend', onHit);
@@ -194,7 +200,11 @@
 
                         setTimeout(() => {
                             attacker.style.transition = 'transform 0.25s ease-in';
-                            attacker.style.transform = 'translate(0, 0)';
+                            let returnTransform = 'translate(0, 0)';
+                            if (isOpponent) {
+                                returnTransform += ' rotate(180deg)';
+                            }
+                            attacker.style.transform = returnTransform;
 
                             const onReturn = () => {
                                 attacker.removeEventListener('transitionend', onReturn);

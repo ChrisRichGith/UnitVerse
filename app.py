@@ -45,6 +45,7 @@ class Unit:
         self.status_effects = [] # e.g. [{'type': 'frenzy', 'duration': 2}]
         self.frenzy_used = False
         self.is_hidden = False
+        self.ability_cooldown = 0
 
     def to_dict(self):
         return {
@@ -90,11 +91,20 @@ class Game:
         self.winner = None
         self.survivors = []
 
+    def _perform_standard_attack(self, attacker):
+        """A basic attack action for units on cooldown or without special abilities."""
+        opponent_player = self.player2 if attacker in self.player1.units else self.player1
+        target = next((u for u in opponent_player.units if not u.is_defeated and not u.is_hidden), None)
+        if target:
+            self._apply_damage(attacker, target, attacker.attack)
+        else:
+            self.combat_log.append({'type': 'idle', 'actor_id': attacker.id, 'actor_name': attacker.class_name, 'reason': 'No target available'})
+
     def run_full_combat(self):
         """Simulates the entire combat from start to finish."""
-        # Reset frenzy state for all units at the start of combat
+        # Reset ability cooldowns at the start of combat
         for unit in self.player1.units + self.player2.units:
-            unit.frenzy_used = False
+            unit.ability_cooldown = 0
 
         turn_order = sorted(self.player1.units + self.player2.units, key=lambda u: u.initiative, reverse=True)
 
@@ -102,9 +112,11 @@ class Game:
             self.round_count = i + 1
             self.combat_log.append({'type': 'round', 'number': self.round_count})
 
-            # --- STATUS EFFECT DURATION HANDLING ---
+            # --- STATUS EFFECT DURATION & COOLDOWN HANDLING ---
             for unit in turn_order:
                 if unit.is_defeated: continue
+                if unit.ability_cooldown > 0:
+                    unit.ability_cooldown -= 1
                 for effect in list(unit.status_effects):
                     effect['duration'] -= 1
                     if effect['duration'] <= 0:
@@ -117,94 +129,89 @@ class Game:
 
                 # --- ACTION LOGIC ---
                 if attacker.class_name == 'Kleriker':
-                    allied_player = self.player1 if attacker in self.player1.units else self.player2
-                    heal_candidates = [u for u in allied_player.units if not u.is_defeated and u.hp < u.max_hp]
-                    if heal_candidates:
-                        heal_candidates.sort(key=lambda u: u.hp / u.max_hp)
-                        target = heal_candidates[0]
-                        heal_amount = 5 + attacker.attributes.get('wis', 0)
-                        original_hp = target.hp
-                        target.hp = min(target.max_hp, target.hp + heal_amount)
-                        self.combat_log.append({
-                            'type': 'heal', 'healer_id': attacker.id, 'healer_name': attacker.class_name,
-                            'target_id': target.id, 'target_name': target.class_name,
-                            'heal_amount': target.hp - original_hp, 'target_hp_after': target.hp
-                        })
+                    if attacker.ability_cooldown == 0:
+                        allied_player = self.player1 if attacker in self.player1.units else self.player2
+                        heal_candidates = [u for u in allied_player.units if not u.is_defeated and u.hp < u.max_hp]
+                        if heal_candidates:
+                            heal_candidates.sort(key=lambda u: u.hp / u.max_hp)
+                            target = heal_candidates[0]
+                            heal_amount = 5 + attacker.attributes.get('wis', 0)
+                            original_hp = target.hp
+                            target.hp = min(target.max_hp, target.hp + heal_amount)
+                            self.combat_log.append({
+                                'type': 'heal', 'healer_id': attacker.id, 'healer_name': attacker.class_name,
+                                'target_id': target.id, 'target_name': target.class_name,
+                                'heal_amount': target.hp - original_hp, 'target_hp_after': target.hp
+                            })
+                            attacker.ability_cooldown = 2
+                        else:
+                            self._perform_standard_attack(attacker)
+                    else:
+                        self._perform_standard_attack(attacker)
+
                 elif attacker.class_name == 'Krieger':
-                    shield_amount = 10 + attacker.attributes.get('str', 0)
-                    attacker.shield += shield_amount
-                    self.combat_log.append({
-                        'type': 'shield', 'actor_id': attacker.id, 'actor_name': attacker.class_name,
-                        'shield_amount': shield_amount, 'shield_total': attacker.shield
-                    })
-                elif attacker.class_name == 'Magier':
-                    opponent_player = self.player2 if attacker in self.player1.units else self.player1
-                    main_target = next((u for u in opponent_player.units if not u.is_defeated and not u.is_hidden), None)
-                    if main_target:
-                        # Find all targets for the preview
-                        splash_targets = self._get_adjacent_units(main_target, opponent_player)
-                        all_target_units = [main_target] + [
-                            t for t in splash_targets
-                            if t != main_target and not t.is_defeated and not t.is_hidden
-                        ]
-                        all_target_ids = [t.id for t in all_target_units]
-
-                        # Add the preview log entry before the attack
+                    if attacker.ability_cooldown == 0:
+                        shield_amount = 10 + attacker.attributes.get('str', 0)
+                        attacker.shield += shield_amount
                         self.combat_log.append({
-                            'type': 'splash_preview',
-                            'attacker_id': attacker.id,
-                            'target_ids': all_target_ids
+                            'type': 'shield', 'actor_id': attacker.id, 'actor_name': attacker.class_name,
+                            'shield_amount': shield_amount, 'shield_total': attacker.shield
                         })
+                        attacker.ability_cooldown = 3
+                    else:
+                        self._perform_standard_attack(attacker)
 
-                        # Apply damage to main target
-                        self._apply_damage(attacker, main_target, attacker.attack)
-
-                        # Apply damage to splash targets
-                        for splash_target in splash_targets:
-                            if splash_target != main_target and not splash_target.is_defeated and not splash_target.is_hidden:
-                                splash_damage = int(attacker.attack * 0.5)
-                                self._apply_damage(attacker, splash_target, splash_damage, is_splash=True)
+                elif attacker.class_name == 'Magier':
+                    if attacker.ability_cooldown == 0:
+                        opponent_player = self.player2 if attacker in self.player1.units else self.player1
+                        main_target = next((u for u in opponent_player.units if not u.is_defeated and not u.is_hidden), None)
+                        if main_target:
+                            splash_targets = self._get_adjacent_units(main_target, opponent_player)
+                            all_target_ids = [main_target.id] + [t.id for t in splash_targets if t != main_target and not t.is_defeated and not t.is_hidden]
+                            self.combat_log.append({'type': 'splash_preview', 'attacker_id': attacker.id, 'target_ids': all_target_ids})
+                            self._apply_damage(attacker, main_target, attacker.attack)
+                            for splash_target in splash_targets:
+                                if splash_target != main_target and not splash_target.is_defeated and not splash_target.is_hidden:
+                                    self._apply_damage(attacker, splash_target, int(attacker.attack * 0.5), is_splash=True)
+                            attacker.ability_cooldown = 2
+                        else:
+                            self._perform_standard_attack(attacker)
+                    else:
+                        self._perform_standard_attack(attacker)
 
                 elif attacker.class_name == 'Barde':
-                    # BATTLE SONG LOGIC
-                    allied_player = self.player1 if attacker in self.player1.units else self.player2
-                    self.combat_log.append({
-                        'type': 'battle_song', 'actor_id': attacker.id, 'actor_name': attacker.class_name
-                    })
-                    for ally in allied_player.units:
-                        if not ally.is_defeated and ally.id != attacker.id:
-                            # Prevent stacking the same buff
-                            if not any(e['type'] == 'battle_song' for e in ally.status_effects):
+                    if attacker.ability_cooldown == 0:
+                        allied_player = self.player1 if attacker in self.player1.units else self.player2
+                        self.combat_log.append({'type': 'battle_song', 'actor_id': attacker.id, 'actor_name': attacker.class_name})
+                        for ally in allied_player.units:
+                            if not ally.is_defeated and ally.id != attacker.id and not any(e['type'] == 'battle_song' for e in ally.status_effects):
                                 ally.status_effects.append({'type': 'battle_song', 'duration': 3})
+                        attacker.ability_cooldown = 3
+                    else:
+                        self._perform_standard_attack(attacker)
+
                 elif attacker.class_name == 'Schurke':
-                    # AMBUSH LOGIC
                     if attacker.is_hidden:
-                        # Ambush attack
                         opponent_player = self.player2 if attacker in self.player1.units else self.player1
                         target = next((u for u in opponent_player.units if not u.is_defeated and not u.is_hidden), None)
                         if target:
-                            # Bonus damage and ignores shield
-                            ambush_damage = int(attacker.attack * 2.0)
-                            self._apply_damage(attacker, target, ambush_damage, ignores_shield=True)
+                            self._apply_damage(attacker, target, int(attacker.attack * 2.0), ignores_shield=True)
                         attacker.is_hidden = False
                         self.combat_log.append({'type': 'unhide', 'actor_id': attacker.id, 'actor_name': attacker.class_name})
-                    else:
-                        # Hide
+                    elif attacker.ability_cooldown == 0:
                         attacker.is_hidden = True
                         self.combat_log.append({'type': 'hide', 'actor_id': attacker.id, 'actor_name': attacker.class_name})
-                else:
-                    # STANDARD ATTACK LOGIC (for Barbar and Abenteurer)
-                    if attacker.class_name == 'Barbar' and not attacker.frenzy_used:
-                        attacker.status_effects.append({'type': 'frenzy', 'duration': 3})
-                        attacker.frenzy_used = True
-                        self.combat_log.append({
-                            'type': 'frenzy_start', 'actor_id': attacker.id, 'actor_name': attacker.class_name
-                        })
+                        attacker.ability_cooldown = 2
+                    else:
+                        self._perform_standard_attack(attacker)
 
-                    opponent_player = self.player2 if attacker in self.player1.units else self.player1
-                    target = next((u for u in opponent_player.units if not u.is_defeated and not u.is_hidden), None)
-                    if target:
-                        self._apply_damage(attacker, target, attacker.attack)
+                else: # Barbar and Abenteurer
+                    if attacker.class_name == 'Barbar' and attacker.ability_cooldown == 0:
+                        attacker.status_effects.append({'type': 'frenzy', 'duration': 3})
+                        self.combat_log.append({'type': 'frenzy_start', 'actor_id': attacker.id, 'actor_name': attacker.class_name})
+                        attacker.ability_cooldown = 4
+
+                    self._perform_standard_attack(attacker)
 
                 if self.check_game_over():
                     break
