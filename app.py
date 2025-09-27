@@ -127,6 +127,10 @@ class Game:
                 if attacker.is_defeated:
                     continue
 
+                # Log which player's turn it is
+                active_player_id = "player1" if attacker in self.player1.units else "player2"
+                self.combat_log.append({'type': 'active_player_turn', 'player_id': active_player_id})
+
                 # --- ACTION LOGIC ---
                 if attacker.class_name == 'Kleriker':
                     if attacker.ability_cooldown == 0:
@@ -359,9 +363,7 @@ def index():
 def start_game():
     global game
     game = Game()
-    player_data = load_data()
-    if player_data:
-        game.player1 = player_data
+    # Do not load saved data when starting a new game. That's for the "Load Game" button.
     game.game_state = "preparation"
     game.shop_units = [generate_random_unit() for _ in range(4)]
     return redirect(url_for('index'))
