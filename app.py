@@ -499,5 +499,14 @@ def upgrade_unit(unit_id):
                 save_data(player)
     return redirect(url_for('barracks'))
 
+
+@app.route('/save_barracks', methods=['POST'])
+def save_barracks():
+    """Saves the current barracks state."""
+    player = load_data()
+    if player:
+        save_data(player)
+    return redirect(url_for('barracks'))
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
