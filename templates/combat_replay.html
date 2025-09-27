@@ -13,13 +13,13 @@
         .game-container { display: flex; flex-direction: column; align-items: center; width: 100%; }
         .combat-main-container {
             display: flex;
-            width: 100%;
+            width: 95%;
             justify-content: center;
             align-items: flex-start;
-            gap: 2em;
+            gap: 1em;
         }
         .boards-container {
-            flex: 3;
+            flex: 2;
             display: flex;
             flex-direction: column;
         }
@@ -63,17 +63,30 @@
             justify-content: center;
         }
         .unit-slot.defeated { background-color: #222 !important; text-decoration: line-through; opacity: 0.4; box-shadow: none; }
+        .logs-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+        }
         .log-area {
-            flex: 2;
-            height: 420px; /* Adjusted height to better match boards */
-            overflow-y: scroll;
-            border: 1px solid #555;
-            padding: 10px;
-            text-align: left;
-            margin: 0.5em 0;
             background-color: #222;
+            border: 1px solid #555;
             border-radius: 8px;
+            padding: 0.5em;
+            height: 200px;
+        }
+        .log-area h4 {
+            margin: 0 0 0.5em;
+            text-align: center;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+        .log-content {
+            height: calc(100% - 30px);
+            overflow-y: auto;
             font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
         }
         .log-area p { margin: 0.3em 0; }
 
@@ -227,8 +240,15 @@
                 </div>
             </div>
 
-            <div class="log-area" id="combat-log-display">
-                <h3>Kampf Log</h3>
+            <div class="logs-container">
+                <div class="log-area" id="player2-log-area">
+                    <h4>PC Aktionen</h4>
+                    <div class="log-content" id="player2-log-display"></div>
+                </div>
+                <div class="log-area" id="player1-log-area">
+                    <h4>Spieler 1 Aktionen</h4>
+                    <div class="log-content" id="player1-log-display"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -259,7 +279,8 @@
 
         if (showAnimation) {
             const combatLog = JSON.parse('{{ combat_log_json|safe }}');
-            const logDisplay = document.getElementById('combat-log-display');
+            const player1Log = document.getElementById('player1-log-display');
+            const player2Log = document.getElementById('player2-log-display');
             let currentStep = 0;
 
             function animateAttack(attacker, target) {
@@ -460,8 +481,22 @@
                     if (actorSlot) actorSlot.classList.remove('hidden');
                 }
 
-                logDisplay.appendChild(p);
-                logDisplay.scrollTop = logDisplay.scrollHeight;
+                if (step.player_owner === 'player1') {
+                    player1Log.appendChild(p);
+                    player1Log.scrollTop = player1Log.scrollHeight;
+                } else if (step.player_owner === 'player2') {
+                    player2Log.appendChild(p);
+                    player2Log.scrollTop = player2Log.scrollHeight;
+                } else {
+                    // For events that apply to both (like round announcements)
+                    const p1 = p.cloneNode(true);
+                    const p2 = p.cloneNode(true);
+                    player1Log.appendChild(p1);
+                    player2Log.appendChild(p2);
+                    player1Log.scrollTop = player1Log.scrollHeight;
+                    player2Log.scrollTop = player2Log.scrollHeight;
+                }
+
                 currentStep++;
                 setTimeout(processNextStep, stepDelay);
             }
