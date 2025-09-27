@@ -317,6 +317,13 @@
                 });
             }
 
+            function playSound(soundFile) {
+                if (soundFile) {
+                    const audio = new Audio(`/static/sounds/SFX/${soundFile}`);
+                    audio.play().catch(e => console.error("Audio-Wiedergabefehler:", e));
+                }
+            }
+
             async function processNextStep() {
                 if (currentStep >= combatLog.length) {
                     document.getElementById('results-area').style.display = 'block';
@@ -326,6 +333,11 @@
                 const step = combatLog[currentStep];
                 const p = document.createElement('p');
                 let stepDelay = 1200;
+
+                // Play sound if one is associated with this log step
+                if (step.sound) {
+                    playSound(step.sound);
+                }
 
                 document.querySelectorAll('.attacking, .attacked, .healing, .shielding, .splash-preview, .self-action').forEach(el => {
                     el.classList.remove('attacking', 'attacked', 'healing', 'shielding', 'splash-preview', 'self-action');
