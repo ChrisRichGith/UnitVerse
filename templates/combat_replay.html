@@ -395,10 +395,6 @@
                         if (healthBar && step.target_max_hp > 0) {
                             healthBar.style.width = `${(step.target_hp_after / step.target_max_hp) * 100}%`;
                         }
-
-                        if (step.defeated) {
-                            targetSlot.classList.add('defeated');
-                        }
                     }
                 } else if (step.type === 'heal') {
                     p.textContent = `${step.healer_name} heilt ${step.target_name} für ${step.heal_amount} HP.`;
@@ -414,6 +410,12 @@
                         if (healthBar && step.target_max_hp > 0) {
                             healthBar.style.width = `${(step.target_hp_after / step.target_max_hp) * 100}%`;
                         }
+                    }
+                } else if (step.type === 'defeated') {
+                    p.innerHTML = `<strong>${step.target_name} wurde besiegt!</strong>`;
+                    const targetSlot = document.getElementById(step.target_id);
+                    if (targetSlot) {
+                        targetSlot.classList.add('defeated');
                     }
                 } else if (step.type === 'shield') {
                     p.textContent = `${step.actor_name} erhält einen Schild von ${step.shield_amount}.`;
