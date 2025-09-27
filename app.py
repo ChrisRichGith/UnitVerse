@@ -145,7 +145,8 @@ class Game:
                             self.combat_log.append({
                                 'type': 'heal', 'healer_id': attacker.id, 'healer_name': attacker.class_name,
                                 'target_id': target.id, 'target_name': target.class_name,
-                                'heal_amount': target.hp - original_hp, 'target_hp_after': target.hp
+                                'heal_amount': target.hp - original_hp, 'target_hp_after': target.hp,
+                                'target_max_hp': target.max_hp
                             })
                             attacker.ability_cooldown = 2
                         else:
@@ -245,7 +246,7 @@ class Game:
             'type': 'attack', 'attacker_id': attacker.id, 'attacker_name': attacker.class_name,
             'target_id': target.id, 'target_name': target.class_name, 'damage': damage,
             'target_hp_after': target.hp, 'target_shield_after': target.shield, 'is_splash': is_splash,
-            'ignores_shield': ignores_shield
+            'ignores_shield': ignores_shield, 'target_max_hp': target.max_hp
         }
         if target.hp == 0:
             target.is_defeated = True
