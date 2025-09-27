@@ -11,11 +11,17 @@
             padding: 1em;
         }
         .game-container { display: flex; flex-direction: column; align-items: center; width: 100%; }
-        .player-area { width: 60%; margin: 0.5em 0; }
-        .active-player-board {
-            border: 2px solid #00c3ff;
+        .player-area {
+            width: 60%;
+            margin: 0.5em 0;
+            padding: 1em;
+            border: 2px solid #444;
+            border-radius: 12px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .active-player-area {
+            border-color: #00c3ff;
             box-shadow: 0 0 15px rgba(0, 195, 255, 0.6);
-            transition: border 0.3s ease, box-shadow 0.3s ease;
         }
         .board {
             display: grid;
@@ -297,16 +303,16 @@
                 });
 
                 if (step.type === 'active_player_turn') {
-                    const player1Board = document.getElementById('player1-area').querySelector('.board');
-                    const player2Board = document.getElementById('player2-area').querySelector('.board');
+                    const player1Area = document.getElementById('player1-area');
+                    const player2Area = document.getElementById('player2-area');
                     let playerName = step.player_id === 'player1' ? {{ game.player1.name|tojson }} : {{ game.player2.name|tojson }};
 
                     if (step.player_id === 'player1') {
-                        player1Board.classList.add('active-player-board');
-                        player2Board.classList.remove('active-player-board');
+                        player1Area.classList.add('active-player-area');
+                        player2Area.classList.remove('active-player-area');
                     } else {
-                        player2Board.classList.add('active-player-board');
-                        player1Board.classList.remove('active-player-board');
+                        player2Area.classList.add('active-player-area');
+                        player1Area.classList.remove('active-player-area');
                     }
                     p.innerHTML = `<em style="color: #00c3ff;">-- ${playerName} ist am Zug --</em>`;
                     stepDelay = 400; // Short delay to make the highlight noticeable
