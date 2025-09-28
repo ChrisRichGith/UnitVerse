@@ -442,6 +442,29 @@ def deploy_unit(unit_id):
             player.board[slot] = deployed_unit
     return redirect(url_for('index'))
 
+
+@app.route('/return_to_barracks/<unit_id>', methods=['POST'])
+def return_to_barracks(unit_id):
+    """Returns a deployed unit from the board back to the barracks selection."""
+    if game.game_state != "preparation":
+        return redirect(url_for('index'))
+
+    player = game.player1
+    # Find the unit instance on the board
+    unit_to_return = next((u for u in player.units if u.id == unit_id), None)
+
+    if unit_to_return:
+        # Remove the unit from the active units list
+        player.units.remove(unit_to_return)
+
+        # Free up the board slot
+        for pos, unit in player.board.items():
+            if unit and unit.id == unit_id:
+                player.board[pos] = None
+                break
+
+    return redirect(url_for('index'))
+
 @app.route('/start_combat', methods=['POST'])
 def start_combat():
     if game.game_state != "preparation":
