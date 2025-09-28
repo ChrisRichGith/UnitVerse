@@ -45,6 +45,10 @@
             <form action="/upgrade_unit/{{ unit.id }}" method="post">
                 <button type="submit" {% if unit.xp < unit.level * 100 %}disabled{% endif %}>Upgrade</button>
             </form>
+        {% elif action == 'board' %}
+            <form action="/return_to_barracks/{{ unit.id }}" method="post" style="display: inline;">
+                <button type="submit" class="return-button" style="background-color: #6c757d; font-size: 0.8em; padding: 0.3em 0.5em;">Zurück</button>
+            </form>
         {% elif action == 'combat' %}
              <div class="shield-display" style="color: #48cae4; font-weight: bold;"></div>
         {% elif action == 'survivor' %}
