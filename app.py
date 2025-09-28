@@ -68,6 +68,36 @@ class Unit:
             unit_id=data.get("id"),
         )
 
+    def add_xp(self, amount):
+        """Adds XP to the unit and handles leveling up."""
+        if self.is_defeated:
+            return
+
+        self.xp += amount
+        leveled_up = False
+        while self.xp >= self.level * 100:
+            self.xp -= self.level * 100
+            self.level += 1
+            leveled_up = True
+            stats_to_upgrade = list(self.attributes.keys())
+            # Ensure we don't try to sample more stats than available
+            num_to_upgrade = min(len(stats_to_upgrade), 2)
+            for stat in random.sample(stats_to_upgrade, num_to_upgrade):
+                self.attributes[stat] += 1
+
+        if leveled_up:
+            # Recalculate derived stats
+            self.max_hp = 50 + (self.attributes.get('con', 0) * 5)
+            self.hp = self.max_hp  # Heal on level up
+            if self.class_name in ['Krieger', 'Barbar']:
+                self.attack = 5 + self.attributes.get('str', 0)
+            elif self.class_name in ['Schurke']:
+                self.attack = 5 + self.attributes.get('dex', 0)
+            elif self.class_name in ['Magier', 'Kleriker', 'Barde']:
+                self.attack = 5 + self.attributes.get('int', 0)
+            else:
+                self.attack = 5
+
 class Player:
     def __init__(self, name, is_ai=False):
         self.name = name
@@ -327,7 +357,7 @@ class Game:
                 xp_per_survivor = xp_pool // len(surviving_units)
                 barracks_ids = {u.id for u in self.player1.barracks}
                 for unit in surviving_units:
-                    unit.xp += xp_per_survivor
+                    unit.add_xp(xp_per_survivor)
                     # Add a flag to indicate if the unit is already in the barracks
                     unit.is_in_barracks = unit.id in barracks_ids
                     self.survivors.append(unit)
@@ -509,18 +539,26 @@ def move_to_barracks(unit_id):
     replace_id = request.form.get('replace_id')
 
     if survivor:
-        # If we are replacing a unit, remove the old one first
-        if replace_id:
-            game.player1.barracks = [u for u in game.player1.barracks if u.id != replace_id]
+        # Check if the survivor is already in the barracks
+        is_existing = False
+        for i, u in enumerate(game.player1.barracks):
+            if u.id == survivor.id:
+                # If yes, replace the old unit with the updated survivor object
+                game.player1.barracks[i] = survivor
+                is_existing = True
+                break
 
-        # Add the new unit if there's space
-        if len(game.player1.barracks) < 3:
-            if not any(u.id == survivor.id for u in game.player1.barracks):
-                barracks_copy = Unit.from_dict(survivor.to_dict())
-                barracks_copy.hp = barracks_copy.max_hp
-                game.player1.barracks.append(barracks_copy)
-                game.survivors.remove(survivor)
-                save_data(game.player1)
+        if not is_existing:
+            # If not in barracks, handle adding or replacing another unit
+            if replace_id:
+                game.player1.barracks = [u for u in game.player1.barracks if u.id != replace_id]
+
+            if len(game.player1.barracks) < 3:
+                game.player1.barracks.append(survivor)
+
+        # The survivor has been processed, remove it from the list
+        game.survivors.remove(survivor)
+        save_data(game.player1)
 
     return render_template('combat_replay.html', game=game, combat_log_json=json.dumps([log for log in game.combat_log]), show_animation=False, class_icons=CLASS_ICONS)
 
@@ -531,26 +569,6 @@ def barracks():
         player_data = game.player1
     return render_template('barracks.html', player=player_data, class_icons=CLASS_ICONS)
 
-@app.route('/upgrade_unit/<unit_id>', methods=['POST'])
-def upgrade_unit(unit_id):
-    player = load_data()
-    if player:
-        unit_to_upgrade = next((u for u in player.barracks if u.id == unit_id), None)
-        if unit_to_upgrade:
-            xp_needed = unit_to_upgrade.level * 100
-            if unit_to_upgrade.xp >= xp_needed:
-                unit_to_upgrade.xp -= xp_needed
-                unit_to_upgrade.level += 1
-                stats_to_upgrade = list(unit_to_upgrade.attributes.keys())
-                for stat in random.sample(stats_to_upgrade, 2):
-                    unit_to_upgrade.attributes[stat] += 1
-                upgraded_unit = Unit.from_dict(unit_to_upgrade.to_dict())
-                for i, u in enumerate(player.barracks):
-                    if u.id == upgraded_unit.id:
-                        player.barracks[i] = upgraded_unit
-                        break
-                save_data(player)
-    return redirect(url_for('barracks'))
 
 
 @app.route('/save_barracks', methods=['POST'])
