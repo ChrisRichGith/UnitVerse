@@ -15,6 +15,7 @@ class Unit:
         self.from_barracks = False
         self.recalculate_stats()
         self.is_defeated = False
+        self.is_hidden = False
         self.position = None
         self.shield = 0
         self.status_effects = []
