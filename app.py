@@ -13,6 +13,7 @@ class Unit:
         self.xp = xp
         self.attributes = attributes
         self.from_barracks = False
+        self.is_hidden = False
         self.recalculate_stats()
         self.is_defeated = False
         self.position = None
