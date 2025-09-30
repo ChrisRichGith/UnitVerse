@@ -303,14 +303,18 @@ def deploy_unit(unit_id):
 def return_to_barracks(unit_id):
     unit_to_return = next((u for u in game.player1.units if u.id == unit_id), None)
     if unit_to_return:
-        game.player1.units.remove(unit_to_return)
+        # Remove the unit from the active team list.
+        game.player1.units = [u for u in game.player1.units if u.id != unit_id]
+        # Remove the unit from the board positions.
         for pos, unit in game.player1.board.items():
             if unit and unit.id == unit_id:
                 game.player1.board[pos] = None
                 break
+        # Add the unit to the barracks if it's not already there.
         if not any(u.id == unit_id for u in game.player1.barracks):
             game.player1.barracks.append(unit_to_return)
-            save_data(game.player1)
+        # Save the updated player data.
+        save_data(game.player1)
     return redirect(url_for('index'))
 
 @app.route('/start_combat', methods=['POST'])

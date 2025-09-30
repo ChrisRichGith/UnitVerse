@@ -37,6 +37,7 @@
                 <button type="submit" {% if player_gold is not none and player_gold < unit.cost %}disabled{% endif %}>Kaufen</button>
             </form>
         {% elif action == 'deploy' %}
+            <div class="xp">XP: {{ unit.xp }} / {{ unit.level * 100 }}</div>
             <form action="/deploy_unit/{{ unit.id }}" method="post">
                 {% set ns = namespace(has_empty_slot=false) %}
                 {% for pos, u in game.player1.board.items() %}
@@ -69,6 +70,7 @@
             </form>
             {% endif %}
         {% elif action == 'board' %}
+            <div class="xp">XP: {{ unit.xp }} / {{ unit.level * 100 }}</div>
             {% if unit.from_barracks %}
                 <form action="{{ url_for('return_to_barracks', unit_id=unit.id) }}" method="post" style="margin-top: 5px;">
                     <button type="submit" class="return-button" style="font-size: 0.8em; padding: 0.3em 0.5em; background-color: #6c757d;">Zurück</button>
