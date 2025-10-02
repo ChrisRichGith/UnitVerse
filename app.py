@@ -214,6 +214,46 @@ class Game:
                     unit.is_in_barracks = unit.id in barracks_ids
                     self.survivors.append(unit)
 
+    def resolve_combat_instantly(self):
+        p1_dpr = sum(u.attack for u in self.player1.units)
+        p2_dpr = sum(u.attack for u in self.player2.units)
+        p1_total_hp = sum(u.hp for u in self.player1.units)
+        p2_total_hp = sum(u.hp for u in self.player2.units)
+
+        rounds_to_kill_p2 = float('inf')
+        if p1_dpr > 0:
+            rounds_to_kill_p2 = p2_total_hp / (p1_dpr * random.uniform(0.9, 1.1))
+
+        rounds_to_kill_p1 = float('inf')
+        if p2_dpr > 0:
+            rounds_to_kill_p1 = p1_total_hp / (p2_dpr * random.uniform(0.9, 1.1))
+
+        if rounds_to_kill_p2 < rounds_to_kill_p1:
+            self.winner = self.player1.name
+        elif rounds_to_kill_p1 < rounds_to_kill_p2:
+            self.winner = self.player2.name
+        else:
+            self.winner = "Unentschieden"
+
+        if self.winner == self.player1.name:
+            for u in self.player2.units:
+                u.is_defeated = True
+
+            xp_pool = sum(u.cost for u in self.player2.units)
+            surviving_units = [u for u in self.player1.units if not u.is_defeated]
+            if surviving_units:
+                xp_per_survivor = xp_pool // len(surviving_units)
+                barracks_ids = {u.id for u in self.player1.barracks}
+                for unit in surviving_units:
+                    unit.add_xp(xp_per_survivor)
+                    unit.is_in_barracks = unit.id in barracks_ids
+                    self.survivors.append(unit)
+        elif self.winner == self.player2.name:
+            for u in self.player1.units:
+                u.is_defeated = True
+
+        self.combat_log.append({'type': 'quick_combat_result', 'winner': self.winner})
+
     def check_game_over(self): return not any(not u.is_defeated for u in self.player1.units) or not any(not u.is_defeated for u in self.player2.units)
     def _get_adjacent_units(self, target_unit, opponent_player):
         if not target_unit.position: return []
@@ -331,9 +371,16 @@ def start_combat():
                 ai_player.units.append(unit_to_buy)
                 ai_player.board[slot] = unit_to_buy
             else: break
-    game.run_full_combat()
+
+    is_quick_combat = request.form.get('quick_combat') == 'true'
+    if is_quick_combat:
+        game.resolve_combat_instantly()
+        show_animation = False
+    else:
+        game.run_full_combat()
+        show_animation = True
+
     game.game_state = "finished"
-    show_animation = request.form.get('show_animation', 'true').lower() == 'true'
     return render_template('combat_replay.html', game=game, combat_log_json=json.dumps(game.combat_log), show_animation=show_animation, class_icons=CLASS_ICONS)
 
 @app.route('/move_to_barracks/<unit_id>', methods=['POST'])
