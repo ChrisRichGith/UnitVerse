@@ -332,7 +332,9 @@ def start_combat():
                 ai_player.board[slot] = unit_to_buy
             else: break
     game.run_full_combat()
-    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps(game.combat_log), show_animation=True, class_icons=CLASS_ICONS)
+    game.game_state = "finished"
+    show_animation = request.form.get('show_animation', 'true').lower() == 'true'
+    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps(game.combat_log), show_animation=show_animation, class_icons=CLASS_ICONS)
 
 @app.route('/move_to_barracks/<unit_id>', methods=['POST'])
 def move_to_barracks(unit_id):
