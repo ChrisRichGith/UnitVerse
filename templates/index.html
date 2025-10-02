@@ -219,8 +219,11 @@
                         </div>
                     {% endfor %}{% endfor %}
                 </div>
-                <form action="/start_combat" method="post" style="margin-top: 1em;">
-                    <button type="submit">Kauf beenden & Kampf starten</button>
+                <form action="/start_combat" method="post" style="margin-top: 1em; display: inline;">
+                    <button type="submit" name="show_animation" value="true">Kauf beenden & Kampf starten</button>
+                </form>
+                <form action="/start_combat" method="post" style="margin-top: 1em; display: inline;">
+                    <button type="submit" name="show_animation" value="false" style="background-color: #ffc107; color: black;">Schnellkampf</button>
                 </form>
             </div>
         </div>

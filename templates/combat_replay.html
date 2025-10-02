@@ -138,6 +138,12 @@
             </div>
 
             <div class="logs-container">
+                {% if show_animation %}
+                <div id="speed-controls" style="text-align: center; margin-bottom: 1em;">
+                    <button id="speed-normal">Normal</button>
+                    <button id="speed-fast">Schnell</button>
+                </div>
+                {% endif %}
                 <div class="log-area" id="player2-log-area">
                     <h4>PC Aktionen</h4>
                     <div class="log-content" id="player2-log-display"></div>
@@ -179,6 +185,10 @@
             const player1Log = document.getElementById('player1-log-display');
             const player2Log = document.getElementById('player2-log-display');
             let currentStep = 0;
+            let animationSpeedFactor = 1.0;
+
+            document.getElementById('speed-normal').addEventListener('click', () => animationSpeedFactor = 1.0);
+            document.getElementById('speed-fast').addEventListener('click', () => animationSpeedFactor = 4.0);
 
             function animateAttack(attacker, target) {
                 return new Promise(resolve => {
@@ -195,7 +205,8 @@
                         dy = -dy;
                     }
                     attacker.style.zIndex = 100;
-                    attacker.style.transition = 'transform 0.25s ease-out';
+                    const transitionDuration = 0.25 / animationSpeedFactor;
+                    attacker.style.transition = `transform ${transitionDuration}s ease-out`;
                     let moveTransform = `translate(${dx}px, ${dy}px)`;
                     if (attacker.closest('#opponent-board')) {
                         moveTransform += ' rotate(180deg)';
@@ -205,7 +216,7 @@
                         attacker.removeEventListener('transitionend', onHit);
                         target.classList.add('attacked');
                         setTimeout(() => {
-                            attacker.style.transition = 'transform 0.25s ease-in';
+                            attacker.style.transition = `transform ${transitionDuration}s ease-in`;
                             let returnTransform = 'translate(0, 0)';
                             if (attacker.closest('#opponent-board')) {
                                 returnTransform += ' rotate(180deg)';
@@ -219,7 +230,7 @@
                                 resolve();
                             };
                             attacker.addEventListener('transitionend', onReturn, { once: true });
-                        }, 150);
+                        }, 150 / animationSpeedFactor);
                     };
                     attacker.addEventListener('transitionend', onHit, { once: true });
                 });
@@ -378,10 +389,10 @@
                 }
 
                 currentStep++;
-                setTimeout(processNextStep, stepDelay);
+                setTimeout(processNextStep, stepDelay / animationSpeedFactor);
             }
 
-            setTimeout(processNextStep, 1000);
+            setTimeout(processNextStep, 1000 / animationSpeedFactor);
         } else {
             document.getElementById('results-area').style.display = 'block';
         }
