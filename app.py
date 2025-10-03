@@ -421,10 +421,5 @@ def barracks():
     if not player_data: player_data = game.player1
     return render_template('barracks.html', player=player_data, class_icons=CLASS_ICONS)
 
-@app.route('/save_barracks', methods=['POST'])
-def save_barracks():
-    save_data(game.player1)
-    return redirect(url_for('barracks'))
-
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
