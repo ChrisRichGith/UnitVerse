@@ -1,17 +1,18 @@
 import uuid
 import json
 import os
-from flask import Flask, render_template, redirect, url_for, request
+from flask import Flask, render_template, redirect, url_for, request, flash, session
 import random
 
 # --- DATA CLASSES ---
 
 class Unit:
-    def __init__(self, attributes, level=1, xp=0, unit_id=None):
+    def __init__(self, attributes, level=1, xp=0, unit_id=None, nickname=None):
         self.id = unit_id if unit_id else str(uuid.uuid4())
         self.level = level
         self.xp = xp
         self.attributes = attributes
+        self.nickname = nickname
         self.from_barracks = False
         self.recalculate_stats()
         self.is_defeated = False
@@ -59,12 +60,12 @@ class Unit:
         return leveled_up
 
     def to_dict(self):
-        return { "id": self.id, "level": self.level, "xp": self.xp, "attributes": self.attributes }
+        return { "id": self.id, "level": self.level, "xp": self.xp, "attributes": self.attributes, "nickname": self.nickname }
 
     @classmethod
     def from_dict(cls, data):
         if "attributes" not in data or not data["attributes"]: return None
-        unit = Unit(attributes=data.get("attributes"), level=data.get("level", 1), xp=data.get("xp", 0), unit_id=data.get("id"))
+        unit = Unit(attributes=data.get("attributes"), level=data.get("level", 1), xp=data.get("xp", 0), unit_id=data.get("id"), nickname=data.get("nickname"))
         return unit
 
 class Player:
@@ -77,7 +78,32 @@ class Player:
         self.board = {f"{r},{c}": None for r in range(2) for c in range(3)}
 
     def to_dict(self):
-        return { "name": self.name, "barracks": [u.to_dict() for u in self.barracks] }
+        return {
+            "name": self.name,
+            "is_ai": self.is_ai,
+            "gold": self.gold,
+            "units": [u.to_dict() for u in self.units],
+            "barracks": [u.to_dict() for u in self.barracks],
+            "board": {pos: (unit.to_dict() if unit else None) for pos, unit in self.board.items()}
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        if not data: return None
+        player = Player(name=data.get("name"), is_ai=data.get("is_ai", False))
+        player.gold = data.get("gold", 100)
+        player.units = [Unit.from_dict(u_data) for u_data in data.get("units", []) if u_data]
+        player.barracks = [Unit.from_dict(u_data) for u_data in data.get("barracks", []) if u_data]
+
+        board_data = data.get("board", {})
+        player.board = {}
+        # Ensure all board positions are present
+        for r in range(2):
+            for c in range(3):
+                pos = f"{r},{c}"
+                u_data = board_data.get(pos)
+                player.board[pos] = Unit.from_dict(u_data) if u_data else None
+        return player
 
 class Game:
     def __init__(self):
@@ -279,41 +305,69 @@ def load_data():
     except (json.JSONDecodeError, KeyError): return None
 
 app = Flask(__name__)
-game = Game()
+app.secret_key = os.urandom(24)
 CLASS_ICONS = {'Krieger': '⚔️', 'Schurke': '🏹', 'Barbar': '🪓', 'Magier': '🔮', 'Kleriker': '✨', 'Barde': '🎵', 'Abenteurer': '🧑‍'}
+
+def get_game_from_session():
+    game_data = session.get('game')
+    if game_data:
+        game = Game()
+        game.player1 = Player.from_dict(game_data.get('player1'))
+        game.player2 = Player.from_dict(game_data.get('player2'))
+        game.game_state = game_data.get('game_state', 'title_screen')
+        game.shop_units = [Unit.from_dict(u) for u in game_data.get('shop_units', [])]
+        game.round_count = game_data.get('round_count', 0)
+        game.winner = game_data.get('winner')
+        game.survivors = [Unit.from_dict(s) for s in game_data.get('survivors', [])]
+        return game
+    return Game()
+
+def save_game_to_session(game):
+    session['game'] = {
+        'player1': game.player1.to_dict(),
+        'player2': game.player2.to_dict(),
+        'game_state': game.game_state,
+        'shop_units': [u.to_dict() for u in game.shop_units],
+        'round_count': game.round_count,
+        'winner': game.winner,
+        'survivors': [s.to_dict() for s in game.survivors],
+    }
 
 @app.route('/')
 def index():
-    global game
+    game = get_game_from_session()
     if game.game_state == "finished":
         game = Game()
-    # The game state is only set to title_screen if it's not already in preparation
     if game.game_state != "preparation":
         game.game_state = "title_screen"
+    save_game_to_session(game)
     save_exists = os.path.exists(SAVE_FILE)
     return render_template('index.html', game=game, save_exists=save_exists, class_icons=CLASS_ICONS)
 
 @app.route('/start_game', methods=['POST'])
 def start_game():
-    global game
-    player_data = load_data()
     game = Game()
-    if player_data: game.player1 = player_data
+    player_data = load_data()
+    if player_data:
+        game.player1 = player_data
     game.game_state = "preparation"
     game.shop_units = [generate_random_unit() for _ in range(4)]
+    save_game_to_session(game)
     return redirect(url_for('index'))
 
 @app.route('/new_game', methods=['POST'])
 def new_game():
-    global game
-    if os.path.exists(SAVE_FILE): os.remove(SAVE_FILE)
+    if os.path.exists(SAVE_FILE):
+        os.remove(SAVE_FILE)
     game = Game()
     game.game_state = "preparation"
     game.shop_units = [generate_random_unit() for _ in range(4)]
+    save_game_to_session(game)
     return redirect(url_for('index'))
 
 @app.route('/buy_unit/<unit_id>', methods=['POST'])
 def buy_unit(unit_id):
+    game = get_game_from_session()
     unit_to_buy = next((u for u in game.shop_units if u.id == unit_id), None)
     if unit_to_buy and game.player1.gold >= unit_to_buy.cost:
         slot = next((pos for pos, unit in game.player1.board.items() if unit is None), None)
@@ -323,10 +377,12 @@ def buy_unit(unit_id):
             game.player1.board[slot] = unit_to_buy
             game.shop_units.remove(unit_to_buy)
             game.shop_units.append(generate_random_unit())
+            save_game_to_session(game)
     return redirect(url_for('index'))
 
 @app.route('/deploy_unit/<unit_id>', methods=['POST'])
 def deploy_unit(unit_id):
+    game = get_game_from_session()
     unit_to_deploy = next((u for u in game.player1.barracks if u.id == unit_id), None)
     slot = request.form.get('slot')
     if unit_to_deploy and not any(u.id == unit_id for u in game.player1.units) and slot and slot in game.player1.board and game.player1.board[slot] is None:
@@ -336,29 +392,30 @@ def deploy_unit(unit_id):
         game.player1.units.append(deployed_unit)
         game.player1.board[slot] = deployed_unit
         game.player1.barracks = [u for u in game.player1.barracks if u.id != unit_id]
-        save_data(game.player1)
+        save_game_to_session(game)
+        save_data(game.player1) # Also save persistent barracks data
     return redirect(url_for('index'))
 
 @app.route('/return_to_barracks/<unit_id>', methods=['POST'])
 def return_to_barracks(unit_id):
+    game = get_game_from_session()
     unit_to_return = next((u for u in game.player1.units if u.id == unit_id), None)
     if unit_to_return:
-        # Remove the unit from the active team list.
         game.player1.units = [u for u in game.player1.units if u.id != unit_id]
-        # Remove the unit from the board positions.
         for pos, unit in game.player1.board.items():
             if unit and unit.id == unit_id:
                 game.player1.board[pos] = None
                 break
-        # Add the unit to the barracks if it's not already there.
         if not any(u.id == unit_id for u in game.player1.barracks):
             game.player1.barracks.append(unit_to_return)
-        # Save the updated player data.
-        save_data(game.player1)
+
+        save_game_to_session(game)
+        save_data(game.player1) # Also save persistent barracks data
     return redirect(url_for('index'))
 
 @app.route('/start_combat', methods=['POST'])
 def start_combat():
+    game = get_game_from_session()
     ai_player = game.player2
     if not ai_player.units:
         candidate_units = sorted([generate_random_unit() for _ in range(10)], key=lambda u: u.cost)
@@ -375,33 +432,60 @@ def start_combat():
     is_quick_combat = request.form.get('quick_combat') == 'true'
     if is_quick_combat:
         game.resolve_combat_instantly()
-        show_animation = False
+        session['show_animation'] = False
     else:
         game.run_full_combat()
-        show_animation = True
+        session['show_animation'] = True
 
     game.game_state = "finished"
-    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps(game.combat_log), show_animation=show_animation, class_icons=CLASS_ICONS)
+    save_game_to_session(game)
+    return redirect(url_for('combat_results'))
+
+@app.route('/combat_results')
+def combat_results():
+    if 'combat_log' not in session:
+        return redirect(url_for('index'))
+
+    combat_log_json = json.dumps(session.get('combat_log', []))
+    show_animation = session.get('show_animation', False)
+    winner = session.get('winner')
+    survivors = [Unit.from_dict(s) for s in session.get('survivors', [])]
+
+    logging.info(f"Rendering combat_replay with winner: {winner}")
+    logging.info(f"Survivors being passed to template: {[s.id for s in survivors]}")
+
+    return render_template('combat_replay.html', game=game, combat_log_json=combat_log_json, show_animation=show_animation, class_icons=CLASS_ICONS, winner=winner, survivors=survivors)
 
 @app.route('/move_to_barracks/<unit_id>', methods=['POST'])
 def move_to_barracks(unit_id):
+    game = get_game_from_session()
+    player_data = load_data() # Barracks are persistent
+    if not player_data:
+        player_data = Player(name="Spieler 1")
+
     survivor = next((u for u in game.survivors if u.id == unit_id), None)
     if survivor:
-        is_existing = False
-        for i, u in enumerate(game.player1.barracks):
-            if u.id == survivor.id:
-                game.player1.barracks[i] = survivor
-                is_existing = True
-                break
-        if not is_existing:
-            replace_id = request.form.get('replace_id')
-            if replace_id:
-                game.player1.barracks = [u for u in game.player1.barracks if u.id != replace_id]
-            if len(game.player1.barracks) < 3:
-                game.player1.barracks.append(survivor)
-        game.survivors.remove(survivor)
-        save_data(game.player1)
-    return render_template('combat_replay.html', game=game, combat_log_json=json.dumps(game.combat_log), show_animation=False, class_icons=CLASS_ICONS)
+        is_existing = any(u.id == survivor.id for u in player_data.barracks)
+
+        if is_existing:
+             # Find and update the existing unit
+            for i, u in enumerate(player_data.barracks):
+                if u.id == survivor.id:
+                    player_data.barracks[i] = survivor
+                    break
+            flash(f"Einheit '{survivor.nickname or survivor.class_name}' aktualisiert.", "success")
+        elif len(player_data.barracks) < 3:
+            player_data.barracks.append(survivor)
+            flash(f"Einheit '{survivor.nickname or survivor.class_name}' in die Kaserne verschoben.", "success")
+        else:
+            flash("Die Kaserne ist voll! Einheit kann nicht hinzugefügt werden.", "error")
+            return redirect(url_for('combat_results'))
+
+        game.survivors = [s for s in game.survivors if s.id != unit_id]
+        save_data(player_data)
+        save_game_to_session(game)
+
+    return redirect(url_for('combat_results'))
 
 @app.route('/level_up_unit/<unit_id>', methods=['POST'])
 def level_up_unit(unit_id):
@@ -418,8 +502,24 @@ def level_up_unit(unit_id):
 @app.route('/barracks')
 def barracks():
     player_data = load_data()
-    if not player_data: player_data = game.player1
+    if not player_data:
+        player_data = Player(name="Spieler 1")
     return render_template('barracks.html', player=player_data, class_icons=CLASS_ICONS)
+
+@app.route('/rename_unit/<unit_id>', methods=['POST'])
+def rename_unit(unit_id):
+    player_data = load_data()
+    if not player_data:
+        return redirect(url_for('barracks'))
+
+    unit_to_rename = next((u for u in player_data.barracks if u.id == unit_id), None)
+
+    if unit_to_rename:
+        new_name = request.form.get('nickname')
+        unit_to_rename.nickname = new_name
+        save_data(player_data)
+
+    return redirect(url_for('barracks'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
