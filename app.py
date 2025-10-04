@@ -336,11 +336,12 @@ def save_game_to_session(game):
 @app.route('/')
 def index():
     game = get_game_from_session()
+    # If the game is finished, we show the title screen but preserve the game state
+    # until a new game is started. This prevents wiping combat results.
     if game.game_state == "finished":
-        game = Game()
-    if game.game_state != "preparation":
         game.game_state = "title_screen"
-    save_game_to_session(game)
+        save_game_to_session(game)
+
     save_exists = os.path.exists(SAVE_FILE)
     return render_template('index.html', game=game, save_exists=save_exists, class_icons=CLASS_ICONS)
 
@@ -443,18 +444,20 @@ def start_combat():
 
 @app.route('/combat_results')
 def combat_results():
-    if 'combat_log' not in session:
-        return redirect(url_for('index'))
+    game = get_game_from_session()
+    if game.game_state != "finished":
+         return redirect(url_for('index'))
 
-    combat_log_json = json.dumps(session.get('combat_log', []))
     show_animation = session.get('show_animation', False)
-    winner = session.get('winner')
-    survivors = [Unit.from_dict(s) for s in session.get('survivors', [])]
+    combat_log_json = json.dumps(game.combat_log)
 
-    logging.info(f"Rendering combat_replay with winner: {winner}")
-    logging.info(f"Survivors being passed to template: {[s.id for s in survivors]}")
-
-    return render_template('combat_replay.html', game=game, combat_log_json=combat_log_json, show_animation=show_animation, class_icons=CLASS_ICONS, winner=winner, survivors=survivors)
+    return render_template('combat_replay.html',
+                           game=game,
+                           combat_log_json=combat_log_json,
+                           show_animation=show_animation,
+                           class_icons=CLASS_ICONS,
+                           winner=game.winner,
+                           survivors=game.survivors)
 
 @app.route('/move_to_barracks/<unit_id>', methods=['POST'])
 def move_to_barracks(unit_id):
