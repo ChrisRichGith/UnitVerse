@@ -98,13 +98,42 @@
         .survivor-container { display: flex; gap: 1em; justify-content: center; flex-wrap: wrap; }
         .replace-select { width: 100%; padding: 0.4em; border-radius: 4px; border: 1px solid #555; background-color: #333; color: #eee; }
 
-        #results-area { background: #1e1e1e; color: #e0e0e0; border: 2px solid #00aaff; box-shadow: 0 0 20px rgba(0, 170, 255, 0.5); border-radius: 10px; padding: 2em; }
+        #results-area {
+            background: rgba(30, 30, 30, 0.95);
+            color: #e0e0e0;
+            border: 2px solid #00aaff;
+            box-shadow: 0 0 20px rgba(0, 170, 255, 0.5);
+            border-radius: 10px;
+            padding: 2em;
+            text-align: center;
+        }
+        .survivor-unit-slot.clickable {
+            cursor: pointer;
+            border: 2px solid #28a745;
+            box-shadow: 0 0 15px rgba(40, 167, 69, 0.7);
+        }
+        .survivor-unit-slot.clickable:hover {
+            transform: scale(1.05);
+        }
+        .flash-messages { list-style-type: none; padding: 0; margin: 0 0 1em 0; }
+        .flash-messages li { padding: 0.8em; margin-bottom: 0.5em; border-radius: 5px; }
+        .flash-messages .success { background-color: #28a745; color: white; }
+        .flash-messages .error { background-color: #dc3545; color: white; }
         button { font-size: 1.1em; padding: 0.5em 1em; margin: 0.5em; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 5px; }
     </style>
 </head>
 {% from "_macros.html" import render_unit_card %}
 
 <body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
     <div class="game-container">
         <div class="combat-main-container">
             <div class="boards-container">
@@ -150,23 +179,16 @@
         </div>
     </div>
 
-    <div id="results-area" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 2px solid black; padding: 2em; display: none; text-align: left;">
+    <div id="results-area" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; text-align: center;">
         <h2>Kampf beendet!</h2>
-        <h3>Sieger: {{ game.winner }}</h3>
-
-        {% if game.winner == game.player1.name and game.survivors %}
-            <h4>Überlebende Einheiten:</h4>
-            <div class="survivor-container">
-            {% for unit in game.survivors %}
-                {{ render_unit_card(unit, class_icons, action='survivor', game=game) }}
-            {% endfor %}
-            </div>
+        <h3>Sieger: {{ winner }}</h3>
+        {% if winner == game.player1.name %}
+            <p>Klicke auf deine überlebenden Einheiten, um sie in die Kaserne zu schicken.</p>
         {% endif %}
-        <br>
         <div class="results-actions" style="margin-top: 1em;">
             <a href="{{ url_for('barracks') }}"><button style="background-color: #6c757d; color: white;">Zur Kaserne</button></a>
             <form action="{{ url_for('start_game') }}" method="post" style="display: inline;">
-                <button type="submit" style="font-size: 1.1em; background-color: #007bff; color: white;">Nächste Runde</button>
+                <button type="submit">Nächste Runde</button>
             </form>
         </div>
     </div>
@@ -232,9 +254,30 @@
                 }
             }
 
+            function showResults() {
+                document.getElementById('results-area').style.display = 'block';
+
+                {% if winner == game.player1.name and survivors %}
+                const survivorIds = {{ survivors|map(attribute='id')|list|tojson }};
+                survivorIds.forEach(unitId => {
+                    const unitSlot = document.getElementById(unitId);
+                    if (unitSlot) {
+                        unitSlot.classList.add('survivor-unit-slot', 'clickable');
+                        unitSlot.addEventListener('click', () => {
+                            const form = document.createElement('form');
+                            form.method = 'POST';
+                            form.action = `/move_to_barracks/${unitId}`;
+                            document.body.appendChild(form);
+                            form.submit();
+                        });
+                    }
+                });
+                {% endif %}
+            }
+
             async function processNextStep() {
                 if (currentStep >= combatLog.length) {
-                    document.getElementById('results-area').style.display = 'block';
+                    showResults();
                     return;
                 }
                 const step = combatLog[currentStep];
@@ -383,7 +426,7 @@
 
             setTimeout(processNextStep, 1000);
         } else {
-            document.getElementById('results-area').style.display = 'block';
+            showResults();
         }
     </script>
 </body>
