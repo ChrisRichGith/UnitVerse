@@ -190,7 +190,7 @@
                 <input type="hidden" name="survivor_ids" id="survivor-ids-input">
                 <button type="submit" id="move-selected-btn" style="display: none; background-color: #28a745;" data-testid="move-selected-button">Ausgewählte in Kaserne verschieben</button>
             </form>
-            <a href="{{ url_for('barracks') }}"><button style="background-color: #6c757d; color: white;">Zur Kaserne</button></a>
+            <a href="{{ url_for('barracks') }}" style="display: inline-block; text-decoration: none; font-size: 1.1em; padding: 0.5em 1em; margin: 0.5em; cursor: pointer; background-color: #6c757d; color: white; border: none; border-radius: 5px;">Zur Kaserne</a>
             <form action="{{ url_for('start_game') }}" method="post" style="display: inline;">
                 <button type="submit">Nächste Runde</button>
             </form>
