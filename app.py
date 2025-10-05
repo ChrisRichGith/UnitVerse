@@ -482,15 +482,21 @@ def start_combat():
 @app.route('/combat_results')
 def combat_results():
     game = get_game_from_session()
-    # The check `if game.game_state != "finished":` was too strict and caused a redirect loop.
-    # The page should be accessible as long as the session was populated by /start_combat.
+
+    # Get the animation flag for the current request.
     show_animation = session.get('show_animation', False)
+
+    # Immediately reset the flag in the session to prevent re-animation on reload.
+    if show_animation:
+        session['show_animation'] = False
+        session.modified = True
+
     combat_log_json = json.dumps(game.combat_log)
 
     return render_template('combat_replay.html',
                            game=game,
                            combat_log_json=combat_log_json,
-                           show_animation=show_animation,
+                           show_animation=show_animation, # Pass the original value to the template
                            class_icons=CLASS_ICONS,
                            winner=game.winner,
                            survivors=game.survivors)
