@@ -218,22 +218,43 @@ class Game:
             self.combat_log.append({'type': 'defeated', 'target_id': target.id, 'target_name': target.class_name, 'sound': f"Dying_0{random.randint(1, 3)}.mp3", 'player_owner': defeated_player_owner})
 
     def determine_winner(self):
-        p1_alive = any(not u.is_defeated for u in self.player1.units)
-        p2_alive = any(not u.is_defeated for u in self.player2.units)
-        if not p2_alive: self.winner = self.player1.name
-        elif not p1_alive: self.winner = self.player2.name
-        elif self.round_count >= 20:
-            p1_hp_pct = sum(u.hp for u in self.player1.units) / sum(u.max_hp for u in self.player1.units) if sum(u.max_hp for u in self.player1.units) > 0 else 0
-            p2_hp_pct = sum(u.hp for u in self.player2.units) / sum(u.max_hp for u in self.player2.units) if sum(u.max_hp for u in self.player2.units) > 0 else 0
-            if p1_hp_pct > p2_hp_pct: self.winner = self.player1.name
-            elif p2_hp_pct > p1_hp_pct: self.winner = self.player2.name
-            else: self.winner = "Unentschieden"
+        # This block determines the winner if one isn't already set (e.g., by quick combat)
+        if self.winner is None:
+            p1_alive = any(not u.is_defeated for u in self.player1.units)
+            p2_alive = any(not u.is_defeated for u in self.player2.units)
+
+            if not p2_alive and p1_alive:
+                self.winner = self.player1.name
+            elif not p1_alive and p2_alive:
+                self.winner = self.player2.name
+            elif not p1_alive and not p2_alive:
+                self.winner = "Unentschieden"
+            elif self.round_count >= 20:
+                p1_hp_total = sum(u.hp for u in self.player1.units)
+                p1_max_hp_total = sum(u.max_hp for u in self.player1.units)
+                p1_hp_pct = p1_hp_total / p1_max_hp_total if p1_max_hp_total > 0 else 0
+
+                p2_hp_total = sum(u.hp for u in self.player2.units)
+                p2_max_hp_total = sum(u.max_hp for u in self.player2.units)
+                p2_hp_pct = p2_hp_total / p2_max_hp_total if p2_max_hp_total > 0 else 0
+
+                if p1_hp_pct > p2_hp_pct:
+                    self.winner = self.player1.name
+                elif p2_hp_pct > p1_hp_pct:
+                    self.winner = self.player2.name
+                else:
+                    self.winner = "Unentschieden"
+
+        # This block calculates survivors and XP if player 1 won.
         if self.winner == self.player1.name:
             xp_pool = sum(u.cost for u in self.player2.units)
             surviving_units = [u for u in self.player1.units if not u.is_defeated]
+
             if surviving_units:
                 xp_per_survivor = xp_pool // len(surviving_units)
-                barracks_ids = {u.id for u in self.player1.barracks}
+                barracks_ids = {b.id for b in self.player1.barracks}
+
+                self.survivors = [] # Clear before appending
                 for unit in surviving_units:
                     unit.add_xp(xp_per_survivor)
                     unit.is_in_barracks = unit.id in barracks_ids
