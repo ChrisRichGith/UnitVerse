@@ -1,0 +1,43 @@
+{
+    "name": "Spieler 1",
+    "is_ai": false,
+    "gold": 100,
+    "units": [
+        {
+            "id": "hero-unit",
+            "level": 20,
+            "xp": 0,
+            "attributes": {
+                "cha": 50,
+                "con": 50,
+                "dex": 50,
+                "int": 50,
+                "str": 50,
+                "wis": 50
+            },
+            "nickname": "Der Unbesiegbare"
+        }
+    ],
+    "barracks": [],
+    "board": {
+        "0,0": {
+            "id": "hero-unit",
+            "level": 20,
+            "xp": 0,
+            "attributes": {
+                "cha": 50,
+                "con": 50,
+                "dex": 50,
+                "int": 50,
+                "str": 50,
+                "wis": 50
+            },
+            "nickname": "Der Unbesiegbare"
+        },
+        "0,1": null,
+        "0,2": null,
+        "1,0": null,
+        "1,1": null,
+        "1,2": null
+    }
+}
