@@ -186,21 +186,17 @@
             <p>Klicke auf deine überlebenden Einheiten, um sie in die Kaserne zu schicken.</p>
         {% endif %}
         <div class="results-actions" style="margin-top: 1em;">
-            <form method="post" style="display: inline;">
+            <form action="{{ url_for('move_survivors_to_barracks') }}" method="post" style="display: inline;">
                 <input type="hidden" name="survivor_ids" id="survivor-ids-input">
-
                 <button type="submit"
                         id="move-selected-btn"
-                        formaction="{{ url_for('move_survivors_to_barracks') }}"
                         style="display: none; background-color: #28a745;"
                         data-testid="move-selected-button">
                     Ausgewählte in Kaserne verschieben
                 </button>
-
-                <button type="submit"
-                        formaction="{{ url_for('start_game') }}">
-                    Nächste Runde
-                </button>
+            </form>
+            <form action="{{ url_for('start_game') }}" method="post" style="display: inline;">
+                <button type="submit">Nächste Runde</button>
             </form>
             <a href="{{ url_for('barracks') }}" style="display: inline-block; text-decoration: none; font-size: 1.1em; padding: 0.5em 1em; margin: 0.5em; cursor: pointer; background-color: #6c757d; color: white; border: none; border-radius: 5px;">Zur Kaserne</a>
         </div>
