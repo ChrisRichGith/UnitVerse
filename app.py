@@ -324,6 +324,7 @@ def get_game_from_session():
         game.round_count = game_data.get('round_count', 0)
         game.winner = game_data.get('winner')
         game.survivors = [Unit.from_dict(s) for s in game_data.get('survivors', [])]
+        game.combat_log = game_data.get('combat_log', [])
         return game
     return Game()
 
@@ -336,6 +337,7 @@ def save_game_to_session(game):
         'round_count': game.round_count,
         'winner': game.winner,
         'survivors': [s.to_dict() for s in game.survivors],
+        'combat_log': game.combat_log,
     }
 
 @app.route('/')
@@ -355,7 +357,13 @@ def start_game():
     game = Game()
     player_data = load_data()
     if player_data:
+        # Load the persistent player data (gold, barracks, etc.)
         game.player1 = player_data
+        # CRITICAL: Reset the transient state for the new round.
+        # The board and active units should always start empty.
+        game.player1.units = []
+        game.player1.board = {f"{r},{c}": None for r in range(2) for c in range(3)}
+
     game.game_state = "preparation"
     game.shop_units = [generate_random_unit() for _ in range(4)]
     save_game_to_session(game)
@@ -388,35 +396,57 @@ def buy_unit(unit_id):
 
 @app.route('/deploy_unit/<unit_id>', methods=['POST'])
 def deploy_unit(unit_id):
+    # 1. Get the current, unified game state from the session.
     game = get_game_from_session()
-    unit_to_deploy = next((u for u in game.player1.barracks if u.id == unit_id), None)
     slot = request.form.get('slot')
-    if unit_to_deploy and not any(u.id == unit_id for u in game.player1.units) and slot and slot in game.player1.board and game.player1.board[slot] is None:
+
+    unit_to_deploy = next((u for u in game.player1.barracks if u.id == unit_id), None)
+    is_already_deployed = any(u.id == unit_id for u in game.player1.units)
+
+    if unit_to_deploy and not is_already_deployed and slot and slot in game.player1.board and game.player1.board[slot] is None:
+        # 2. Modify the game state object directly.
         deployed_unit = Unit.from_dict(unit_to_deploy.to_dict())
         deployed_unit.from_barracks = True
         deployed_unit.position = slot
+
+        # Add to board and active units
         game.player1.units.append(deployed_unit)
         game.player1.board[slot] = deployed_unit
+
+        # Remove from barracks
         game.player1.barracks = [u for u in game.player1.barracks if u.id != unit_id]
+
+        # 3. Save the single, authoritative state to both file and session.
+        save_data(game.player1)
         save_game_to_session(game)
-        save_data(game.player1) # Also save persistent barracks data
+
     return redirect(url_for('index'))
 
 @app.route('/return_to_barracks/<unit_id>', methods=['POST'])
 def return_to_barracks(unit_id):
+    # 1. Get the current, unified game state from the session.
     game = get_game_from_session()
+
     unit_to_return = next((u for u in game.player1.units if u.id == unit_id), None)
+
     if unit_to_return:
+        # 2. Modify the game state object directly.
+
+        # Remove from board and active units
         game.player1.units = [u for u in game.player1.units if u.id != unit_id]
         for pos, unit in game.player1.board.items():
             if unit and unit.id == unit_id:
                 game.player1.board[pos] = None
                 break
+
+        # Add to barracks if it's not already there
         if not any(u.id == unit_id for u in game.player1.barracks):
             game.player1.barracks.append(unit_to_return)
 
+        # 3. Save the single, authoritative state to both file and session.
+        save_data(game.player1)
         save_game_to_session(game)
-        save_data(game.player1) # Also save persistent barracks data
+
     return redirect(url_for('index'))
 
 @app.route('/start_combat', methods=['POST'])
@@ -452,15 +482,21 @@ def start_combat():
 @app.route('/combat_results')
 def combat_results():
     game = get_game_from_session()
-    # The check `if game.game_state != "finished":` was too strict and caused a redirect loop.
-    # The page should be accessible as long as the session was populated by /start_combat.
+
+    # Get the animation flag for the current request.
     show_animation = session.get('show_animation', False)
+
+    # Immediately reset the flag in the session to prevent re-animation on reload.
+    if show_animation:
+        session['show_animation'] = False
+        session.modified = True
+
     combat_log_json = json.dumps(game.combat_log)
 
     return render_template('combat_replay.html',
                            game=game,
                            combat_log_json=combat_log_json,
-                           show_animation=show_animation,
+                           show_animation=show_animation, # Pass the original value to the template
                            class_icons=CLASS_ICONS,
                            winner=game.winner,
                            survivors=game.survivors)
@@ -493,6 +529,45 @@ def move_to_barracks(unit_id):
         game.survivors = [s for s in game.survivors if s.id != unit_id]
         save_data(player_data)
         save_game_to_session(game)
+
+    return redirect(url_for('combat_results'))
+
+@app.route('/move_survivors_to_barracks', methods=['POST'])
+def move_survivors_to_barracks():
+    game = get_game_from_session()
+    player_data = load_data() or Player(name="Spieler 1")
+
+    survivor_ids_json = request.form.get('survivor_ids')
+    if not survivor_ids_json:
+        return redirect(url_for('combat_results'))
+
+    survivor_ids = json.loads(survivor_ids_json)
+    moved_count = 0
+
+    for unit_id in survivor_ids:
+        survivor = next((u for u in game.survivors if u.id == unit_id), None)
+        if survivor:
+            if len(player_data.barracks) < 3:
+                is_existing = any(u.id == survivor.id for u in player_data.barracks)
+                if is_existing:
+                    for i, u in enumerate(player_data.barracks):
+                        if u.id == survivor.id:
+                            player_data.barracks[i] = survivor
+                            break
+                else:
+                    player_data.barracks.append(survivor)
+
+                game.survivors = [s for s in game.survivors if s.id != unit_id]
+                moved_count += 1
+            else:
+                flash("Die Kaserne ist voll! Einige Einheiten konnten nicht verschoben werden.", "error")
+                break
+
+    if moved_count > 0:
+        flash(f"{moved_count} Einheit(en) in die Kaserne verschoben.", "success")
+
+    save_data(player_data)
+    save_game_to_session(game)
 
     return redirect(url_for('combat_results'))
 
