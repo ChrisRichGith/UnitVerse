@@ -15,7 +15,7 @@
             <form action="/start_game" method="post" style="display: inline;">
                 <button type="submit">Nächste Runde</button>
             </form>
-            <form action="/new_game" method="post" style="display: inline;" onsubmit="return confirm('Bist du sicher, dass du ein neues Spiel starten möchtest? Dein gesamter Fortschritt wird gelöscht.');">
+            <form action="/new_game" method="post" style="display: inline;">
                 <button type="submit" style="background-color: #6c757d;">Neues Spiel</button>
             </form>
         {% else %}
@@ -29,6 +29,7 @@
     <div class="prep-container">
         <div class="side-panel">
             <h3>Kaserne</h3>
+            <a href="{{ url_for('barracks') }}" class="button-link">Zur Kaserne</a>
             {% if game.player1.barracks %}
                 {% for unit in game.player1.barracks %}
                     {{ render_unit_card(unit, class_icons, action='deploy', game=game) }}
@@ -42,17 +43,7 @@
             <div class="team-panel">
                 <h2>Gegner</h2>
                 <div class="board" id="opponent-board">
-                    {% for r in range(2) %}{% for c in range(3) %}
-                        {% set slot_id = r ~ ',' ~ c %}
-                        {% set unit = game.player2.board.get(slot_id) %}
-                        <div class="slot">
-                        {% if unit %}
-                            {{ render_unit_card(unit, class_icons, action='preview') }}
-                        {% else %}
-                            (Leer)
-                        {% endif %}
-                        </div>
-                    {% endfor %}{% endfor %}
+                    {% for r in range(2) %}{% for c in range(3) %}<div class="slot">(Leer)</div>{% endfor %}{% endfor %}
                 </div>
             </div>
             <div class="team-panel">
