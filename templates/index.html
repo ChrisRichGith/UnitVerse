@@ -15,7 +15,7 @@
             <form action="/start_game" method="post" style="display: inline;">
                 <button type="submit">Nächste Runde</button>
             </form>
-            <form action="/new_game" method="post" style="display: inline;" onsubmit="return confirm('Bist du sicher, dass du ein neues Spiel starten möchtest? Dein gesamter Fortschritt wird gelöscht.');">
+            <form action="/new_game" method="post" style="display: inline;">
                 <button type="submit" style="background-color: #6c757d;">Neues Spiel</button>
             </form>
         {% else %}
@@ -29,6 +29,7 @@
     <div class="prep-container">
         <div class="side-panel">
             <h3>Kaserne</h3>
+            <a href="{{ url_for('barracks') }}" class="button-link">Zur Kaserne</a>
             {% if game.player1.barracks %}
                 {% for unit in game.player1.barracks %}
                     {{ render_unit_card(unit, class_icons, action='deploy', game=game) }}
