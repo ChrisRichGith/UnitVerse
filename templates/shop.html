@@ -14,7 +14,7 @@
         <h2>Verfügbare Ausrüstung</h2>
         <div class="equipment-list">
             {% for item in shop_items %}
-                {{ render_equipment_card(item, action='buy', player_gold=player.gold) }}
+                {{ render_equipment_card(item, action='buy', player_gold=player.gold, player=player) }}
             {% endfor %}
         </div>
     </div>

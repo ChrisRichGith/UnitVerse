@@ -6,12 +6,13 @@ import random
 # --- DATA CLASSES ---
 
 class Equipment:
-    def __init__(self, name, equip_type, bonuses, cost, equipment_id=None):
+    def __init__(self, name, equip_type, bonuses, cost, allowed_classes=None, equipment_id=None):
         self.id = equipment_id if equipment_id else str(uuid.uuid4())
         self.name = name
         self.type = equip_type
         self.bonuses = bonuses
         self.cost = cost
+        self.allowed_classes = allowed_classes if allowed_classes is not None else []
 
     def to_dict(self):
         return {
@@ -20,6 +21,7 @@ class Equipment:
             "type": self.type,
             "bonuses": self.bonuses,
             "cost": self.cost,
+            "allowed_classes": self.allowed_classes,
         }
 
     @classmethod
@@ -32,6 +34,7 @@ class Equipment:
             equip_type=data.get("type"),
             bonuses=data.get("bonuses"),
             cost=data.get("cost"),
+            allowed_classes=data.get("allowed_classes", []),
         )
 
 class Unit:
@@ -133,7 +136,6 @@ class Player:
         self.round_count = 0
         self.units = []
         self.barracks = []
-        self.equipment_inventory = []
         self.board = {f"{r},{c}": None for r in range(2) for c in range(3)}
 
     def to_dict(self):
@@ -144,7 +146,6 @@ class Player:
             "round_count": self.round_count,
             "units": [u.to_dict() for u in self.units],
             "barracks": [u.to_dict() for u in self.barracks],
-            "equipment_inventory": [e.to_dict() for e in self.equipment_inventory],
             "board": {pos: (unit.to_dict() if unit else None) for pos, unit in self.board.items()}
         }
 
@@ -156,7 +157,6 @@ class Player:
         player.round_count = data.get("round_count", 0)
         player.units = [Unit.from_dict(u_data) for u_data in data.get("units", []) if u_data]
         player.barracks = [Unit.from_dict(u_data) for u_data in data.get("barracks", []) if u_data]
-        player.equipment_inventory = [Equipment.from_dict(e_data) for e_data in data.get("equipment_inventory", [])]
         board_data = data.get("board", {})
         player.board = {}
         # Ensure all board positions are present
@@ -752,10 +752,10 @@ def rename_unit(unit_id):
 
 def get_shop_items():
     return [
-        Equipment(name="Rostiges Schwert", equip_type="Waffe", bonuses={"str": 2}, cost=20),
-        Equipment(name="Holzschild", equip_type="Rüstung", bonuses={"con": 2}, cost=20),
-        Equipment(name="Stab des Anfängers", equip_type="Waffe", bonuses={"int": 2}, cost=20),
-        Equipment(name="Lederrüstung", equip_type="Rüstung", bonuses={"dex": 2}, cost=20),
+        Equipment(name="Rostiges Schwert", equip_type="Waffe", bonuses={"str": 2}, cost=20, allowed_classes=["Krieger", "Barbar"]),
+        Equipment(name="Holzschild", equip_type="Rüstung", bonuses={"con": 2}, cost=20, allowed_classes=["Krieger", "Barbar", "Kleriker"]),
+        Equipment(name="Stab des Anfängers", equip_type="Waffe", bonuses={"int": 2}, cost=20, allowed_classes=["Magier", "Kleriker", "Barde"]),
+        Equipment(name="Lederrüstung", equip_type="Rüstung", bonuses={"dex": 2}, cost=20, allowed_classes=["Schurke", "Barde"]),
     ]
 
 @app.route('/shop')
@@ -763,40 +763,13 @@ def shop():
     player_data = load_data()
     if not player_data:
         player_data = Player(name="Spieler 1")
+        # For testing, create a default unit if none exist
+        if not player_data.barracks and not player_data.units:
+            player_data.barracks.append(Unit(attributes={'str': 12, 'dex': 8, 'con': 10, 'int': 5, 'wis': 5, 'cha': 5})) # A Warrior
+            save_data(player_data)
 
     shop_items = get_shop_items()
     return render_template('shop.html', player=player_data, shop_items=shop_items)
-
-@app.route('/equip_item/<item_id>', methods=['POST'])
-def equip_item(item_id):
-    player_data = load_data()
-    if not player_data:
-        return redirect(url_for('barracks'))
-
-    unit_id = request.form.get('unit_id')
-    item_to_equip = next((item for item in player_data.equipment_inventory if item.id == item_id), None)
-    unit_to_equip = next((unit for unit in player_data.barracks if unit.id == unit_id), None)
-
-    if item_to_equip and unit_to_equip:
-        if item_to_equip.type == 'Waffe':
-            # If the unit already has a weapon, move it back to the inventory
-            if unit_to_equip.weapon:
-                player_data.equipment_inventory.append(unit_to_equip.weapon)
-            unit_to_equip.weapon = item_to_equip
-        elif item_to_equip.type == 'Rüstung':
-            # If the unit already has armor, move it back to the inventory
-            if unit_to_equip.armor:
-                player_data.equipment_inventory.append(unit_to_equip.armor)
-            unit_to_equip.armor = item_to_equip
-
-        player_data.equipment_inventory = [item for item in player_data.equipment_inventory if item.id != item_id]
-        unit_to_equip.recalculate_stats()
-        save_data(player_data)
-        flash(f"'{item_to_equip.name}' an '{unit_to_equip.nickname or unit_to_equip.class_name}' ausgerüstet.", "success")
-    else:
-        flash("Ausrüsten fehlgeschlagen. Gegenstand oder Einheit nicht gefunden.", "error")
-
-    return redirect(url_for('barracks'))
 
 @app.route('/buy_equipment/<item_id>', methods=['POST'])
 def buy_equipment(item_id):
@@ -804,18 +777,40 @@ def buy_equipment(item_id):
     if not player_data:
         return redirect(url_for('shop'))
 
+    unit_id = request.form.get('unit_id')
     shop_items = get_shop_items()
     item_to_buy = next((item for item in shop_items if item.id == item_id), None)
 
-    if item_to_buy and player_data.gold >= item_to_buy.cost:
-        player_data.gold -= item_to_buy.cost
-        player_data.equipment_inventory.append(item_to_buy)
-        save_data(player_data)
-        flash(f"'{item_to_buy.name}' gekauft!", "success")
-    elif item_to_buy:
-        flash("Nicht genug Gold!", "error")
-    else:
+    # Combine barracks and board units for equipping
+    all_player_units = player_data.barracks + player_data.units
+    unit_to_equip = next((unit for unit in all_player_units if unit.id == unit_id), None)
+
+    if not item_to_buy:
         flash("Gegenstand nicht gefunden!", "error")
+        return redirect(url_for('shop'))
+
+    if not unit_to_equip:
+        flash("Einheit nicht gefunden!", "error")
+        return redirect(url_for('shop'))
+
+    if player_data.gold < item_to_buy.cost:
+        flash("Nicht genug Gold!", "error")
+        return redirect(url_for('shop'))
+
+    if unit_to_equip.class_name not in item_to_buy.allowed_classes:
+        flash(f"Diese Ausrüstung kann nicht von einem '{unit_to_equip.class_name}' getragen werden.", "error")
+        return redirect(url_for('shop'))
+
+    # Equip the item directly
+    if item_to_buy.type == 'Waffe':
+        unit_to_equip.weapon = item_to_buy
+    elif item_to_buy.type == 'Rüstung':
+        unit_to_equip.armor = item_to_buy
+
+    player_data.gold -= item_to_buy.cost
+    unit_to_equip.recalculate_stats()
+    save_data(player_data)
+    flash(f"'{item_to_buy.name}' an '{unit_to_equip.nickname or unit_to_equip.class_name}' ausgerüstet.", "success")
 
     return redirect(url_for('shop'))
 
