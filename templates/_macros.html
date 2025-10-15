@@ -1,4 +1,4 @@
-{% macro render_equipment_card(item, action=None, player_gold=None) %}
+{% macro render_equipment_card(item, action=None, player_gold=None, player=None) %}
     <div class="unit-card equipment-card">
         <div class="unit-card-header">
             <strong>{{ item.name }}</strong>
@@ -13,18 +13,20 @@
         </div>
         <div class="unit-card-footer">
             <p class="cost">Preis: {{ item.cost }} Gold</p>
-            {% if action == 'buy' %}
+            {% if action == 'buy' and player %}
                 <form action="{{ url_for('buy_equipment', item_id=item.id) }}" method="post">
-                    <button type="submit" {% if player_gold < item.cost %}disabled{% endif %}>Kaufen</button>
-                </form>
-            {% elif action == 'equip' %}
-                <form action="{{ url_for('equip_item', item_id=item.id) }}" method="post">
+                    {% set eligible_units = [] %}
+                    {% for unit in player.barracks + player.units %}
+                        {% if unit.class_name in item.allowed_classes %}
+                            {% set _ = eligible_units.append(unit) %}
+                        {% endif %}
+                    {% endfor %}
                     <select name="unit_id">
-                        {% for unit in player.barracks %}
+                        {% for unit in eligible_units %}
                             <option value="{{ unit.id }}">{{ unit.nickname or unit.class_name }}</option>
                         {% endfor %}
                     </select>
-                    <button type="submit">Ausrüsten</button>
+                    <button type="submit" {% if player_gold < item.cost or not eligible_units %}disabled{% endif %}>Kaufen & Ausrüsten</button>
                 </form>
             {% endif %}
         </div>
