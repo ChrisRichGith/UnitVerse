@@ -5,13 +5,44 @@ from flask import Flask, render_template, redirect, url_for, request, flash, ses
 import random
 # --- DATA CLASSES ---
 
+class Equipment:
+    def __init__(self, name, equip_type, bonuses, cost, equipment_id=None):
+        self.id = equipment_id if equipment_id else str(uuid.uuid4())
+        self.name = name
+        self.type = equip_type
+        self.bonuses = bonuses
+        self.cost = cost
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.type,
+            "bonuses": self.bonuses,
+            "cost": self.cost,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        if not data:
+            return None
+        return Equipment(
+            equipment_id=data.get("id"),
+            name=data.get("name"),
+            equip_type=data.get("type"),
+            bonuses=data.get("bonuses"),
+            cost=data.get("cost"),
+        )
+
 class Unit:
-    def __init__(self, attributes, level=1, xp=0, unit_id=None, nickname=None):
+    def __init__(self, attributes, level=1, xp=0, unit_id=None, nickname=None, weapon=None, armor=None):
         self.id = unit_id if unit_id else str(uuid.uuid4())
         self.level = level
         self.xp = xp
         self.attributes = attributes
         self.nickname = nickname
+        self.weapon = weapon
+        self.armor = armor
         self.from_barracks = False
         self.recalculate_stats()
         self.is_defeated = False
@@ -23,18 +54,29 @@ class Unit:
 
     def recalculate_stats(self):
         """Recalculates derived stats after an attribute change."""
-        primary_stat = max(self.attributes, key=self.attributes.get)
+        # Start with base attributes
+        current_attributes = self.attributes.copy()
+
+        # Add bonuses from equipment
+        if self.weapon and self.weapon.bonuses:
+            for stat, bonus in self.weapon.bonuses.items():
+                current_attributes[stat] = current_attributes.get(stat, 0) + bonus
+        if self.armor and self.armor.bonuses:
+            for stat, bonus in self.armor.bonuses.items():
+                current_attributes[stat] = current_attributes.get(stat, 0) + bonus
+
+        primary_stat = max(current_attributes, key=current_attributes.get)
         class_map = {
             'str': 'Krieger', 'dex': 'Schurke', 'con': 'Barbar',
             'int': 'Magier', 'wis': 'Kleriker', 'cha': 'Barde'
         }
         self.class_name = class_map.get(primary_stat, 'Abenteurer')
-        self.max_hp = 50 + (self.attributes.get('con', 0) * 5)
+        self.max_hp = 50 + (current_attributes.get('con', 0) * 5)
         self.hp = self.max_hp
-        self.initiative = self.attributes.get('dex', 0)
-        if self.class_name in ['Krieger', 'Barbar']: self.attack = 5 + self.attributes.get('str', 0)
-        elif self.class_name in ['Schurke']: self.attack = 5 + self.attributes.get('dex', 0)
-        elif self.class_name in ['Magier', 'Kleriker', 'Barde']: self.attack = 5 + self.attributes.get('int', 0)
+        self.initiative = current_attributes.get('dex', 0)
+        if self.class_name in ['Krieger', 'Barbar']: self.attack = 5 + current_attributes.get('str', 0)
+        elif self.class_name in ['Schurke']: self.attack = 5 + current_attributes.get('dex', 0)
+        elif self.class_name in ['Magier', 'Kleriker', 'Barde']: self.attack = 5 + current_attributes.get('int', 0)
         else: self.attack = 5
         self.cost = sum(self.attributes.values()) // 2
 
@@ -59,13 +101,29 @@ class Unit:
         return leveled_up
 
     def to_dict(self):
-        return { "id": self.id, "level": self.level, "xp": self.xp, "attributes": self.attributes, "nickname": self.nickname }
+        return {
+            "id": self.id,
+            "level": self.level,
+            "xp": self.xp,
+            "attributes": self.attributes,
+            "nickname": self.nickname,
+            "weapon": self.weapon.to_dict() if self.weapon else None,
+            "armor": self.armor.to_dict() if self.armor else None,
+        }
 
     @classmethod
     def from_dict(cls, data):
-        if "attributes" not in data or not data["attributes"]: return None
-        unit = Unit(attributes=data.get("attributes"), level=data.get("level", 1), xp=data.get("xp", 0), unit_id=data.get("id"), nickname=data.get("nickname"))
-        return unit
+        if "attributes" not in data or not data["attributes"]:
+            return None
+        return Unit(
+            attributes=data.get("attributes"),
+            level=data.get("level", 1),
+            xp=data.get("xp", 0),
+            unit_id=data.get("id"),
+            nickname=data.get("nickname"),
+            weapon=Equipment.from_dict(data.get("weapon")),
+            armor=Equipment.from_dict(data.get("armor")),
+        )
 
 class Player:
     def __init__(self, name, is_ai=False):
@@ -75,6 +133,7 @@ class Player:
         self.round_count = 0
         self.units = []
         self.barracks = []
+        self.equipment_inventory = []
         self.board = {f"{r},{c}": None for r in range(2) for c in range(3)}
 
     def to_dict(self):
@@ -85,6 +144,7 @@ class Player:
             "round_count": self.round_count,
             "units": [u.to_dict() for u in self.units],
             "barracks": [u.to_dict() for u in self.barracks],
+            "equipment_inventory": [e.to_dict() for e in self.equipment_inventory],
             "board": {pos: (unit.to_dict() if unit else None) for pos, unit in self.board.items()}
         }
 
@@ -96,7 +156,7 @@ class Player:
         player.round_count = data.get("round_count", 0)
         player.units = [Unit.from_dict(u_data) for u_data in data.get("units", []) if u_data]
         player.barracks = [Unit.from_dict(u_data) for u_data in data.get("barracks", []) if u_data]
-
+        player.equipment_inventory = [Equipment.from_dict(e_data) for e_data in data.get("equipment_inventory", [])]
         board_data = data.get("board", {})
         player.board = {}
         # Ensure all board positions are present
@@ -396,6 +456,7 @@ def index():
     if game.game_state == "finished":
         game.game_state = "title_screen"
         save_game_to_session(game)
+        return redirect(url_for('index'))
 
     save_exists = os.path.exists(SAVE_FILE)
     return render_template('index.html', game=game, save_exists=save_exists, class_icons=CLASS_ICONS)
@@ -688,6 +749,75 @@ def rename_unit(unit_id):
         save_data(player_data)
 
     return redirect(url_for('barracks'))
+
+def get_shop_items():
+    return [
+        Equipment(name="Rostiges Schwert", equip_type="Waffe", bonuses={"str": 2}, cost=20),
+        Equipment(name="Holzschild", equip_type="Rüstung", bonuses={"con": 2}, cost=20),
+        Equipment(name="Stab des Anfängers", equip_type="Waffe", bonuses={"int": 2}, cost=20),
+        Equipment(name="Lederrüstung", equip_type="Rüstung", bonuses={"dex": 2}, cost=20),
+    ]
+
+@app.route('/shop')
+def shop():
+    player_data = load_data()
+    if not player_data:
+        player_data = Player(name="Spieler 1")
+
+    shop_items = get_shop_items()
+    return render_template('shop.html', player=player_data, shop_items=shop_items)
+
+@app.route('/equip_item/<item_id>', methods=['POST'])
+def equip_item(item_id):
+    player_data = load_data()
+    if not player_data:
+        return redirect(url_for('barracks'))
+
+    unit_id = request.form.get('unit_id')
+    item_to_equip = next((item for item in player_data.equipment_inventory if item.id == item_id), None)
+    unit_to_equip = next((unit for unit in player_data.barracks if unit.id == unit_id), None)
+
+    if item_to_equip and unit_to_equip:
+        if item_to_equip.type == 'Waffe':
+            # If the unit already has a weapon, move it back to the inventory
+            if unit_to_equip.weapon:
+                player_data.equipment_inventory.append(unit_to_equip.weapon)
+            unit_to_equip.weapon = item_to_equip
+        elif item_to_equip.type == 'Rüstung':
+            # If the unit already has armor, move it back to the inventory
+            if unit_to_equip.armor:
+                player_data.equipment_inventory.append(unit_to_equip.armor)
+            unit_to_equip.armor = item_to_equip
+
+        player_data.equipment_inventory = [item for item in player_data.equipment_inventory if item.id != item_id]
+        unit_to_equip.recalculate_stats()
+        save_data(player_data)
+        flash(f"'{item_to_equip.name}' an '{unit_to_equip.nickname or unit_to_equip.class_name}' ausgerüstet.", "success")
+    else:
+        flash("Ausrüsten fehlgeschlagen. Gegenstand oder Einheit nicht gefunden.", "error")
+
+    return redirect(url_for('barracks'))
+
+@app.route('/buy_equipment/<item_id>', methods=['POST'])
+def buy_equipment(item_id):
+    player_data = load_data()
+    if not player_data:
+        return redirect(url_for('shop'))
+
+    shop_items = get_shop_items()
+    item_to_buy = next((item for item in shop_items if item.id == item_id), None)
+
+    if item_to_buy and player_data.gold >= item_to_buy.cost:
+        player_data.gold -= item_to_buy.cost
+        player_data.equipment_inventory.append(item_to_buy)
+        save_data(player_data)
+        flash(f"'{item_to_buy.name}' gekauft!", "success")
+    elif item_to_buy:
+        flash("Nicht genug Gold!", "error")
+    else:
+        flash("Gegenstand nicht gefunden!", "error")
+
+    return redirect(url_for('shop'))
 
 
 if __name__ == '__main__':

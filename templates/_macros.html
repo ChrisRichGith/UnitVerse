@@ -1,3 +1,36 @@
+{% macro render_equipment_card(item, action=None, player_gold=None) %}
+    <div class="unit-card equipment-card">
+        <div class="unit-card-header">
+            <strong>{{ item.name }}</strong>
+        </div>
+        <div class="unit-card-body">
+            <p>Typ: {{ item.type }}</p>
+            <p>Boni:
+                {% for stat, bonus in item.bonuses.items() %}
+                    {{ stat.upper() }}: +{{ bonus }}
+                {% endfor %}
+            </p>
+        </div>
+        <div class="unit-card-footer">
+            <p class="cost">Preis: {{ item.cost }} Gold</p>
+            {% if action == 'buy' %}
+                <form action="{{ url_for('buy_equipment', item_id=item.id) }}" method="post">
+                    <button type="submit" {% if player_gold < item.cost %}disabled{% endif %}>Kaufen</button>
+                </form>
+            {% elif action == 'equip' %}
+                <form action="{{ url_for('equip_item', item_id=item.id) }}" method="post">
+                    <select name="unit_id">
+                        {% for unit in player.barracks %}
+                            <option value="{{ unit.id }}">{{ unit.nickname or unit.class_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit">Ausrüsten</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+{% endmacro %}
+
 {% macro render_unit_card(unit, class_icons, action=None, player_gold=None, game=None) %}
 <div class="unit-card" data-unit-id="{{ unit.id }}" {% if action == 'deploy' %}draggable="true"{% endif %}>
     <div class="unit-card-header">
@@ -26,6 +59,10 @@
             STR:{{ unit.attributes.str }} DEX:{{ unit.attributes.dex }} CON:{{ unit.attributes.con }}<br>
             INT:{{ unit.attributes.int }} WIS:{{ unit.attributes.wis }} CHA:{{ unit.attributes.cha }}
             </small>
+        </div>
+        <div class="equipment-display" style="font-size: 0.9em; color: #ccc; margin-top: 5px;">
+            <p style="margin: 2px 0;">Waffe: {{ unit.weapon.name if unit.weapon else 'Keine' }}</p>
+            <p style="margin: 2px 0;">Rüstung: {{ unit.armor.name if unit.armor else 'Keine' }}</p>
         </div>
     </div>
     <div class="unit-card-footer">
